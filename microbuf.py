@@ -76,7 +76,7 @@ def main():
         for field_name, field_type in mmsg_yaml["content"].items():
             message.add_field(field_name, field_type)
 
-        print("-- Creating MATLAB interface for message {}...".format(mmsg_name))
+        print("-- Creating C++ interface for message {}...".format(message.name))
 
 
 
