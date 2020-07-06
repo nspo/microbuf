@@ -77,11 +77,10 @@ def main():
             message.add_field(field_name, field_type)
 
         print("-- Creating C++ interface for message {}...".format(message.name))
+        cpp_enc = CppEncoderGenerator(message)
 
-
-
-
-
+        print(cpp_enc.gen_header_filename())
+        print(cpp_enc.gen_header_content())
 
 
 if __name__ == "__main__":
