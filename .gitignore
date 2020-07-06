@@ -1,3 +1,7 @@
+# project-specific
+cpp/cmake-build-debug
+cpp/foo
+
 .idea/
 
 # Byte-compiled / optimized / DLL files

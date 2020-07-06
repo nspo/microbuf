@@ -10,7 +10,7 @@ namespace microbuf {
     namespace internal {
         bool is_big_endian() {
             uint16_t num = 1;
-            if (*(uint8_t *) &num == 1) {
+            if (*(uint8_t *) &num == 1) { // could be rewritten with bytes_union
                 // Little Endian
                 return false;
             } else {
@@ -28,7 +28,7 @@ namespace microbuf {
 
         template <typename T>
         void append_forward(std::vector<uint8_t>& bytes, const T& union_data) {
-            // append data in same order as currently in memory (i.e. it's already big-endian in memory)
+            // append data in same order as currently in memory (i.e. it's already Big-Endian in memory)
             for(size_t i=0; i<sizeof(T); ++i) {
                 bytes.push_back(union_data.bytes[i]);
             }
@@ -36,7 +36,7 @@ namespace microbuf {
 
         template <typename T>
         void append_backward(std::vector<uint8_t>& bytes, const T& union_data) {
-            // append data in reverse order (i.e. it's little-endian in memory)
+            // append data in reverse order (i.e. it's Little-Endian in memory)
             for(size_t i=0; i<sizeof(T); ++i) {
                 bytes.push_back(union_data.bytes[sizeof(T)-1-i]);
             }
