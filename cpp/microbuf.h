@@ -167,6 +167,17 @@ namespace microbuf {
             append_backward(bytes, val_union);
         }
     }
+
+    void append_bool(std::vector<uint8_t>& bytes, const bool val) {
+        // add bool to end of data
+        using namespace internal;
+
+        if(val) {
+            bytes.push_back(0xc3);
+        } else {
+            bytes.push_back(0xc2);
+        }
+    }
 }
 
 #endif //MICROBUF_MICROBUF_H

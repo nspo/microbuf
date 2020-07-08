@@ -74,13 +74,28 @@ def main():
         message = Message(mmsg_name, mmsg_version)
 
         for field_name, field_type in mmsg_yaml["content"].items():
-            message.add_field(field_name, field_type)
+            if field_type.isalnum():
+                # plain data type
+                field = MessageFieldPlain(field_name, field_type)
+            else:
+                # check if plain array type
+                match = re.fullmatch(r"([a-z0-9]+)\[([0-9]+)\]", field_type)
+                if match:
+                    field = MessageFieldPlainArray(field_name, field_type=match.group(1),
+                                                   array_length=int(match.group(2)))
+                else:
+                    logging.error("Field '{}' has invalid type '{}'".format(field_name, field_type))
+                    sys.exit(1)
+
+            message.add_field(field)
+
 
         print("-- Creating C++ interface for message {}...".format(message.name))
-        cpp_enc = CppEncoderGenerator(message)
-
-        print(cpp_enc.gen_header_filename())
-        print(cpp_enc.gen_header_content())
+        cpp_enc = CppInterfaceGenerator(message)
+        cpp_file_path = os.path.join(args.out, cpp_enc.gen_header_filename())
+        print("---- Saving as {}".format(cpp_file_path))
+        with open(cpp_file_path, "w") as outfile:
+            outfile.write(cpp_enc.gen_header_content())
 
 
 if __name__ == "__main__":

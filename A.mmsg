@@ -2,3 +2,7 @@ version: 1
 content:
   foo: float32
   bar: float32
+  balls: float32[10]
+  num: uint16
+  my_bool: bool
+  size: uint64[22]

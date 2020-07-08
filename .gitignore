@@ -1,6 +1,7 @@
 # project-specific
 cpp/cmake-build-debug
 cpp/foo
+output/
 
 .idea/
 
