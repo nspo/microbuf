@@ -31,10 +31,10 @@ def main():
         os.mkdir(args.out)
         logging.debug("Created folder {}".format(args.out))
 
-    print("--- Generated code will be stored in {}".format(args.out))
+    print("-- Generated code will be stored in {}".format(args.out))
 
     for mmsg_file in args.mmsg_file:
-        print("--- Trying to read interface description file {}...".format(mmsg_file))
+        print("-- Trying to read interface description file {}...".format(mmsg_file))
 
         if not mmsg_file.endswith(".mmsg"):
             logging.error("Filename {} does not end with .mmsg".format(mmsg_file))
@@ -93,7 +93,7 @@ def main():
         print("-- Creating C++ interface for message {}...".format(message.name))
         cpp_enc = CppInterfaceGenerator(message)
         cpp_file_path = os.path.join(args.out, cpp_enc.gen_header_filename())
-        print("---- Saving as {}".format(cpp_file_path))
+        print("--- Saving as {}".format(cpp_file_path))
         with open(cpp_file_path, "w") as outfile:
             outfile.write(cpp_enc.gen_header_content())
 

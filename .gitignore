@@ -1,9 +1,10 @@
 # project-specific
-cpp/cmake-build-debug
+*/cmake-build-debug
 cpp/foo
 output/
 
 .idea/
+*/.idea/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

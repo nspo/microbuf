@@ -149,7 +149,7 @@ class CppInterfaceGenerator:
 
     def _gen_struct(self):
         S4 = "    " # spaces
-        str_struct = "{}_struct_t {{\n".format(self.message.name)
+        str_struct = "struct {}_struct_t {{\n".format(self.message.name)
         for field in self.message.fields:
             str_struct += S4 + self._get_definition_line(field) + "\n"
 
