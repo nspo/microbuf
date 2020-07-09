@@ -1,4 +1,5 @@
 # project-specific
+cmake-build-debug/
 */cmake-build-debug
 cpp/foo
 output/
