@@ -3,6 +3,12 @@ cmake-build-debug/
 */cmake-build-debug
 cpp/foo
 output/
+examples/+bastibe_msgp/
+
+# matlab / simulink
+*.*~
+*.autosave
+slprj/
 
 .idea/
 */.idea/
