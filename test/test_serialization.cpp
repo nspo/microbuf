@@ -31,5 +31,7 @@ TEST(microbuf_cpp_serialization, MessageA)
     a.bar = 4.56;
 
     std::vector<uint8_t> expected_bytes {0x91};
+
+    std::cout<<"Num bytes in A after serialization: "<<a.as_bytes().size()<<"\n";
     EXPECT_EQ(a.as_bytes(), expected_bytes);
 }

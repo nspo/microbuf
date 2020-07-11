@@ -4,7 +4,7 @@
 import logging
 import sys
 import typing
-from abc import ABC
+from abc import ABC, abstractmethod
 import string
 
 
@@ -16,12 +16,42 @@ class PlainTypes:
     uint64 = "uint64"
     float32 = "float32"
     float64 = "float64"
-    all = (bool, uint8, uint16, uint32, uint64, float32, float64)
+
+    storage_size = {
+        # storage size in bytes needed for each plain field
+        bool: 1,
+        uint8: 1+1,
+        uint16: 1+2,
+        uint32: 1+4,
+        uint64: 1+8,
+        float32: 1+4,
+        float64: 1+8
+    }
+
+    all = (bool, uint8, uint16, uint32, uint64, float32, float64)  # simplify this?
+
+class ArrayTypes:
+    fixarray = "fixarray"
+    array16 = "array16"
+    array32 = "array32"
+
+    storage_size = {
+        fixarray: 1,
+        array16: 1+2,
+        array32: 1+4
+    }
+
+    max_length = {
+        fixarray: 15,
+        array16: 65535,
+        array32: 4294967295
+    }
 
 
 class MessageField(ABC):
     """ Abstract class: field inside a message"""
 
+    @abstractmethod
     def __init__(self, field_name: str):
         # check field name
         allowed_chars = set(string.ascii_lowercase + string.ascii_uppercase + string.digits + '_')
@@ -36,6 +66,16 @@ class MessageField(ABC):
 
         self.name = field_name
 
+    @abstractmethod
+    def get_num_of_plain_fields(self):
+        """ Return number of plain/flat fields """
+        pass
+
+    @abstractmethod
+    def get_num_of_bytes(self):
+        """ Return number of bytes needed for storing this field in the serialized format """
+        pass
+
 
 class MessageFieldPlain(MessageField):
     """ Field inside a message with a plain data type (e.g. float32) """
@@ -48,6 +88,12 @@ class MessageFieldPlain(MessageField):
 
         self.type = field_type
 
+    def get_num_of_plain_fields(self):
+        return 1
+
+    def get_num_of_bytes(self):
+        return PlainTypes.storage_size[self.type]
+
 
 class MessageFieldPlainArray(MessageFieldPlain):
     """ Field inside a message which contains an array of plain data types (e.g. float32[4]) """
@@ -59,6 +105,13 @@ class MessageFieldPlainArray(MessageFieldPlain):
             sys.exit(1)
 
         self.array_length = array_length
+
+    def get_num_of_plain_fields(self):
+        return self.array_length*1
+
+    def get_num_of_bytes(self):
+        # does not include actually marking this as its own array
+        return self.array_length*PlainTypes.storage_size[self.type]
 
 
 class Message:
@@ -78,14 +131,31 @@ class Message:
         """
         num = 0
         for field in self.fields:
-            if type(field) == MessageFieldPlain:
-                num = num+1
-            elif type(field) == MessageFieldPlainArray:
-                num = num+field.array_length
-            else:
-                logging.error("Field type unknown: {}".format(field))
+            num = num+field.get_num_of_plain_fields()
 
         return num
+
+    def get_num_of_bytes(self):
+        """ Calculate number of bytes needed to store this message (excluding a possible CRC value)
+        """
+        num_bytes = 0
+        for field in self.fields:
+            num_bytes = num_bytes + field.get_num_of_bytes()
+
+        # add size of leading array
+        num_plain_fields = self.get_num_of_plain_fields()
+        if num_plain_fields <= ArrayTypes.max_length[ArrayTypes.fixarray]:
+            num_bytes = num_bytes + ArrayTypes.storage_size[ArrayTypes.fixarray]
+        elif num_plain_fields <= ArrayTypes.max_length[ArrayTypes.array16]:
+            num_bytes = num_bytes + ArrayTypes.storage_size[ArrayTypes.array16]
+        elif num_plain_fields <= ArrayTypes.max_length[ArrayTypes.array32]:
+            num_bytes = num_bytes + ArrayTypes.storage_size[ArrayTypes.array32]
+        else:
+            logging.error("Too many plain fields ({}, excluding initial array) in message '{}'".format(num_plain_fields,
+                                                                                                       self.name))
+            sys.exit(1)
+
+        return num_bytes
 
 
 class CppInterfaceGenerator:
@@ -157,6 +227,7 @@ class CppInterfaceGenerator:
         str_struct += S4+"\n"
         str_struct += S4+"std::vector<uint8_t> as_bytes() const {\n"
         str_struct += S4*2+"std::vector<uint8_t> bytes;\n"
+        str_struct += S4*2+"bytes.reserve({});\n".format(self.message.get_num_of_bytes())
         str_struct += S4*2+"microbuf::append_array(bytes, {});\n".format(self.message.get_num_of_plain_fields())
         for field in self.message.fields:
             if type(field) == MessageFieldPlain:
