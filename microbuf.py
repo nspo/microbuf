@@ -97,6 +97,12 @@ def main():
         with open(cpp_file_path, "w") as outfile:
             outfile.write(cpp_enc.gen_header_content())
 
+        print("-- Creating MATLAB interface for message {}...".format(message.name))
+        mat_if = MatlabInterfaceGenerator(message)
+        mat_file_path = os.path.join(args.out, mat_if.gen_deserializer_filename())
+        print("--- Saving as {}".format(mat_file_path))
+        with open(mat_file_path, "w") as outfile:
+            outfile.write(mat_if.gen_deserializer_content())
 
 if __name__ == "__main__":
     main()
