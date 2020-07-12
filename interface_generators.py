@@ -255,11 +255,11 @@ class CppInterfaceGenerator:
 class MatlabInterfaceGenerator:
     DATA_TYPE_LOOKUP = {
         # microbuf data type: [MATLAB data type, MATLAB init value, MATLAB deserialize function]
-        PlainTypes.bool: ["bool", "false", "parse_bool"],
-        PlainTypes.uint8: ["uint8", "0", "parse_uint8"],
-        PlainTypes.uint16: ["uint16", "0", "parse_uint16"],
-        PlainTypes.uint32: ["uint32", "0", "parse_uint32"],
-        PlainTypes.uint64: ["uint64", "0", "parse_uint64"]
+        PlainTypes.bool: ["bool", "false", "microbuf.parse_bool"],
+        PlainTypes.uint8: ["uint8", "0", "microbuf.parse_uint8"],
+        PlainTypes.uint16: ["uint16", "0", "microbuf.parse_uint16"],
+        PlainTypes.uint32: ["uint32", "0", "microbuf.parse_uint32"],
+        PlainTypes.uint64: ["uint64", "0", "microbuf.parse_uint64"]
     }
 
     def __init__(self, message: Message):
@@ -268,20 +268,41 @@ class MatlabInterfaceGenerator:
     def gen_deserializer_filename(self):
         return "deserialize_{}.m".format(self.message.name)
 
-    def _get_deserialization_lines(self, field: MessageField):
-        """ Get the C++ serialization line of a plain field """
+    def _get_initialization_line(self, field: MessageField):
         if (type(field) == MessageFieldPlain or type(field) == MessageFieldPlainArray) and (
                 field.type not in MatlabInterfaceGenerator.DATA_TYPE_LOOKUP):
-            logging.error("Deserialization for type {} is unknown".format(field.type))
+            logging.error("Initialization for type {} is unknown".format(field.type))
             sys.exit(1)
 
         if type(field) == MessageFieldPlain:
-            lines = "[idx, err, value] = {}(bytes, bytes_length, idx);\n".format(MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field.type][2])
-            lines += "if err ;return; end\n\n"
+            return "{} = {}({});\n".format(field.name, MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field.type][0],
+                                           MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field.type][1])
         elif type(field) == MessageFieldPlainArray:
-            lines = "for i=1:10\n"
-            lines += "    [idx, err, value] = {}(bytes, bytes_length, idx);\n".format(MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field.type][2])
-            lines += "    if err ;return; end\n"
+            return "{} = repmat({}({}), 1, {});\n".format(field.name,
+                                                          MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field.type][0],
+                                                          MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field.type][1],
+                                                          field.array_length)
+
+    def _get_plain_deserialization_lines(self, field_type: str, object_name, line_indent: str =""):
+        """ Get the C++ serialization line of a plain field """
+        if field_type not in MatlabInterfaceGenerator.DATA_TYPE_LOOKUP:
+            logging.error("Deserialization for type {} is unknown".format(field_type))
+            sys.exit(1)
+
+        lines = line_indent+"[idx, err, {}] = {}(bytes, bytes_length, idx);\n".format(object_name,
+                                                                           MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[
+                                                                               field_type][2])
+        lines += line_indent+"if err ;return; end\n"
+
+        return lines
+
+    def _get_deserialization_lines(self, field: MessageField):
+        if type(field) == MessageFieldPlain:
+            lines = self._get_plain_deserialization_lines(field.type, field.name)
+        elif type(field) == MessageFieldPlainArray:
+            lines = "for i=1:{}\n".format(field.array_length)
+            lines += self._get_plain_deserialization_lines(field.type, "{}(i)".format(field.name),
+                                                           "    ")
             lines += "end\n\n"
         else:
             logging.error("Field type unknown: {}".format(field))
@@ -292,12 +313,15 @@ class MatlabInterfaceGenerator:
     def gen_deserializer_content(self):
         S4 = "    "  # spaces
 
-        deserial = "function [err, {}] = deserialize_{}(bytes, length)".format(
+        deserial = "function [err, {}] = deserialize_{}(bytes, bytes_length)".format(
             ", ".join(f.name for f in self.message.fields), self.message.name)
         deserial += "\n"
         deserial += "err = true;\n\n"
 
-        deserial += "% TODO: init vars\n\n" # TODO
+        for field in self.message.fields:
+            deserial += self._get_initialization_line(field)
+
+        deserial += "\n"
 
         # check length of bytes array
         deserial += "if bytes_length < {}\n    return\nend\n\n".format(self.message.get_num_of_bytes())
@@ -305,13 +329,12 @@ class MatlabInterfaceGenerator:
         deserial += "idx = 1;\n\n"
 
         # check initial array
-        deserial += "[idx, err] = check_array(bytes, bytes_length, {}, idx);\n".format(
+        deserial += "[idx, err] = microbuf.check_array(bytes, bytes_length, {}, idx);\n".format(
             self.message.get_num_of_plain_fields())
         deserial += "if err ;return; end\n\n"
 
         for field in self.message.fields:
             deserial += self._get_deserialization_lines(field)
-            # TODO others
 
         deserial += "end"
         return deserial

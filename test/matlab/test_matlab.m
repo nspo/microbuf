@@ -2,6 +2,36 @@ disp('Executing MATLAB microbuf deserialization tests');
 
 addpath('../../matlab');
 
+disp('- array tests...');
+
+disp('-- fixarray tests...');
+
+bytes = uint8([hex2dec('95')]);
+[idx, err] = microbuf.check_array(bytes, length(bytes), 5, 1);
+if idx ~= 2 || err
+    error('fixarray err');
+end
+
+bytes = uint8([hex2dec('9f')]);
+[idx, err] = microbuf.check_array(bytes, length(bytes), 15, 1);
+if idx ~= 2 || err
+    error('fixarray err');
+end
+
+bytes = uint8([hex2dec('90')]);
+[idx, err] = microbuf.check_array(bytes, length(bytes), 0, 1);
+if idx ~= 2 || err
+    error('fixarray err');
+end
+
+bytes = uint8([hex2dec('95')]);
+[idx, err] = microbuf.check_array(bytes, length(bytes), 6, 1);
+if ~err
+    error('fixarray err');
+end
+
+% TODO: array16, array32
+
 disp('- uint tests...');
 
 disp('-- uint8 tests...');

@@ -1,4 +1,4 @@
-{function [idx, err, value] = parse_uint8(bytes, bytes_length, idx)
+function [idx, err, value] = parse_uint8(bytes, bytes_length, idx)
 
 err = true;
 

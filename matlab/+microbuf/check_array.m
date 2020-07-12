@@ -10,7 +10,7 @@ end
 
 if array_length <= 2^4-1
     % try fixarray
-    if bitand(bin2dec('11110000'), bytes(idx)) == bin2dec('11110000')
+    if bitand(bin2dec('11110000'), bytes(idx)) == bin2dec('10010000')
         % prefix matches
         encoded_length = bitand(bin2dec('00001111'), bytes(idx));
         if encoded_length == array_length
