@@ -9,6 +9,8 @@ examples/+bastibe_msgp/
 *.*~
 *.autosave
 slprj/
+*_rtw/
+*.mat
 
 .idea/
 */.idea/
