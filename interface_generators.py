@@ -47,7 +47,6 @@ class ArrayTypes:
         array32: 4294967295
     }
 
-
 class MessageField(ABC):
     """ Abstract class: field inside a message"""
 
@@ -119,9 +118,10 @@ class MessageFieldPlainArray(MessageFieldPlain):
 
 
 class Message:
-    def __init__(self, name: str, version: int):
+    def __init__(self, name: str, version: int, append_checksum: bool):
         self.name = name
         self.version = version
+        self.append_checksum = append_checksum
         self.fields = []  # type: typing.List[MessageField]
 
     def add_field(self, field: MessageField):
@@ -136,6 +136,8 @@ class Message:
         num = 0
         for field in self.fields:
             num = num+field.get_num_of_plain_fields()
+
+        # do not count checksum field at the end b/c it's not part of the main array
 
         return num
 
@@ -158,6 +160,10 @@ class Message:
             logging.error("Too many plain fields ({}, excluding initial array) in message '{}'".format(num_plain_fields,
                                                                                                        self.name))
             sys.exit(1)
+
+        if self.append_checksum:
+            # also count checksum field at the end b/c it needs storage space
+            num_bytes = num_bytes + PlainTypes.storage_size[PlainTypes.uint16]
 
         return num_bytes
 
@@ -243,6 +249,9 @@ class CppInterfaceGenerator:
             else:
                 logging.error("Unknown field object {}".format(field))
                 sys.exit(1)
+
+        if self.message.append_checksum:
+            str_struct += S4*2+"microbuf::append_crc(bytes);\n"
 
         str_struct += S4*2+"return bytes;\n"
         str_struct += S4+"}\n"
@@ -335,6 +344,10 @@ class MatlabInterfaceGenerator:
 
         for field in self.message.fields:
             deserial += self._get_deserialization_lines(field)
+
+        if self.message.append_checksum:
+            deserial += "[err] = microbuf.check_crc(bytes, bytes_length, idx);\n\n"
+            # no "if err; return; end" needed here b/c we're at the end of the function already
 
         deserial += "end"
         return deserial

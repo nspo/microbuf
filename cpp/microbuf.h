@@ -219,13 +219,7 @@ namespace microbuf {
 
         const uint16_t crc = internal::crc16_aug_ccitt(&bytes[0], bytes.size());
 
-        bytes_union<uint16_t> val_union {};
-        val_union.val = crc;
-        if(is_big_endian()) {
-            append_forward(bytes, val_union);
-        } else {
-            append_backward(bytes, val_union);
-        }
+        append_uint16(bytes, crc);
     }
 }
 

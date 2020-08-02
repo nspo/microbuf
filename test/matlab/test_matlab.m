@@ -141,4 +141,30 @@ if ~err || ~isa(value, 'logical')
     error('bool err');
 end
 
+disp('- CRC tests...');
+if microbuf.crc16_aug_ccitt([], 0) ~= hex2dec('1d0f')
+    error('CRC error');
+end
+
+
+if microbuf.crc16_aug_ccitt(uint8('A'), 1) ~= hex2dec('9479')
+    error('CRC error');
+end
+
+if microbuf.crc16_aug_ccitt(uint8('123456789'), 9) ~= hex2dec('e5cc')
+    error('CRC error');
+end
+
+if microbuf.crc16_aug_ccitt(uint8('1234567890'), 10) ~= hex2dec('57d8')
+    error('CRC error');
+end
+
+if microbuf.crc16_aug_ccitt(repmat(uint8('A'), 1, 256), 256) ~= hex2dec('e938')
+    error('CRC error');
+end
+
+if microbuf.check_crc(uint8([hex2dec('cd') hex2dec('1d') hex2dec('0f')]), 3, 1) == true
+    error('CRC error');
+end
+
 disp('All tests passed!');

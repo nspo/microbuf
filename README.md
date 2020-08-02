@@ -18,6 +18,9 @@ the data using `microbuf`, and send it via UDP on the network to the embedded sy
 system could then deserialize the data (as the `MATLAB` deserializer was converted automatically 
 into C before compiling for the target system) and use it for the intended purpose.
 
+## Development state
+Work in progress / some parts may not build
+
 ## Why not just use `protobuf`/`JSON`/...?
 Using another library with more features like [protobuf](https://github.com/protocolbuffers/protobuf) may indeed make sense in many cases.
 `microbuf` is intended for use cases with limitations, e.g. when it is hard (or even impossible) to use

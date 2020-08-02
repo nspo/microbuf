@@ -71,7 +71,12 @@ def main():
             logging.error("{} has malformed content fields".format(mmsg_file))
             sys.exit(1)
 
-        message = Message(mmsg_name, mmsg_version)
+        if "append_checksum" in mmsg_yaml and mmsg_yaml["append_checksum"] is True:
+            append_checksum = True
+        else:
+            append_checksum = False
+
+        message = Message(mmsg_name, mmsg_version, append_checksum=append_checksum)
 
         for field_name, field_type in mmsg_yaml["content"].items():
             if field_type.isalnum():

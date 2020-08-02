@@ -1,4 +1,5 @@
 version: 1
+append_checksum: yes
 content:
   foo: uint8 #float32
   bar: uint16 # float64
