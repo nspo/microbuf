@@ -1,7 +1,6 @@
 #include "gtest/gtest.h"
-#include "A.h"
-#include "microbuf_debug.h"
 #include <cstdint>
+#include "microbuf_debug.h"
 #include <iostream>
 
 TEST(microbuf_cpp_serialization, fixarray)
@@ -76,21 +75,6 @@ TEST(microbuf_cpp_serialization, floating_point)
     bytes.clear();
 }
 
-TEST(microbuf_cpp_serialization, MessageA)
-{
-    // TODO
-
-    A_struct_t a;
-    a.foo = 1.23;
-    a.bar = 4.56;
-
-//    microbuf::debug::print_debug(a.as_bytes());
-
-//    std::cout<<"Num bytes in A after serialization: "<<a.as_bytes().size()<<"\n";
-//    EXPECT_EQ(a.as_bytes(), {0x01,2,3}));
-}
-
-
 TEST(microbuf_cpp_serialization, CRC16_AUG_CCITT)
 {
     // test CRC16-AUG/CCITT implementation
@@ -115,13 +99,11 @@ TEST(microbuf_cpp_serialization, append_crc)
 {
     std::vector<uint8_t> bytes, expected_bytes;
 
-    microbuf::append_array(bytes, 2);
+    microbuf::append_array(bytes, 1);
     microbuf::append_uint64(bytes, 1234567890123456789);
     microbuf::append_crc(bytes);
 
-    microbuf::debug::print_debug(bytes);
-
-    expected_bytes = {0xcc, 0x05, 0xcc, 0x2a, 0xcc, 0xff};
+    expected_bytes = {0x91,  0xcf, 0x11, 0x22, 0x10, 0xf4,  0x7d,  0xe9,  0x81,  0x15, 0xcd,  0x14, 0xe9 };
     EXPECT_EQ(bytes, expected_bytes);
     bytes.clear();
 }
