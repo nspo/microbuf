@@ -19,6 +19,20 @@ TEST(microbuf_cpp_serialization, fixarray)
     bytes.clear();
 }
 
+TEST(microbuf_cpp_serialization, boolean)
+{
+    std::vector<uint8_t> bytes, expected_bytes;
+
+    microbuf::append_array(bytes, 4);
+    microbuf::append_bool(bytes, true);
+    microbuf::append_bool(bytes, false);
+    microbuf::append_bool(bytes, false);
+    microbuf::append_bool(bytes, true);
+    expected_bytes = {0x94, 0xc3, 0xc2, 0xc2, 0xc3};
+    EXPECT_EQ(bytes, expected_bytes);
+    bytes.clear();
+}
+
 TEST(microbuf_cpp_serialization, uint)
 {
     std::vector<uint8_t> bytes, expected_bytes;
@@ -58,6 +72,11 @@ TEST(microbuf_cpp_serialization, uint)
                       0xcf, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x68, 0xa0,
                       0xcf, 0x11, 0x22, 0x10, 0xf4, 0x7D, 0xe9, 0x81, 0x15
     };
+    EXPECT_EQ(bytes, expected_bytes);
+    bytes.clear();
+
+    microbuf::append_uint64(bytes, 18446744073709551615U);
+    expected_bytes = {0xcf, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
     EXPECT_EQ(bytes, expected_bytes);
     bytes.clear();
 }
