@@ -41,6 +41,40 @@ namespace microbuf {
                 bytes.push_back(union_data.bytes[sizeof(T)-1-i]);
             }
         }
+
+        uint16_t crc16_aug_ccitt(const uint8_t *ptr, uint32_t count) {
+            // Return CRC16/AUG-CCITT (https://reveng.sourceforge.io/crc-catalogue/16.htm)
+            // width=16 poly=0x1021 init=0x1d0f refin=false refout=false xorout=0x0000
+            // check=0xe5cc residue=0x0000 name="CRC-16/SPI-FUJITSU"
+            //
+            // Compare http://srecord.sourceforge.net/crc16-ccitt.html and
+            // https://hg.ulukai.org/ecm/crc16-t/file/f5262db9f5e0/test2.c#l40
+            uint16_t crc;
+            uint8_t i, v, ch;
+            crc = 0xFFFF;
+            while (count) {
+                ch = *ptr++;
+                i = 8;
+                v = 0x80;
+                do {
+                    if (crc & 0x8000)
+                        crc = (crc << 1) ^ 0x1021;
+                    else
+                        crc = (crc << 1);
+                    if (ch & v)
+                        crc ^= 1;
+                    v >>= 1;
+                } while (--i);
+                --count;
+            }
+            for (i = 0; i < 16; ++i) {
+                if (crc & 0x8000)
+                    crc = (crc << 1) ^ 0x1021;
+                else
+                    crc = (crc << 1);
+            }
+            return (crc);
+        }
     }
 
     void append_array(std::vector<uint8_t>& bytes, const size_t length) {
@@ -176,6 +210,21 @@ namespace microbuf {
             bytes.push_back(0xc3);
         } else {
             bytes.push_back(0xc2);
+        }
+    }
+
+    void append_crc(std::vector<uint8_t>& bytes) {
+        // add CRC checksum to end of data
+        using namespace internal;
+
+        const uint16_t crc = internal::crc16_aug_ccitt(&bytes[0], bytes.size());
+
+        bytes_union<uint16_t> val_union {};
+        val_union.val = crc;
+        if(is_big_endian()) {
+            append_forward(bytes, val_union);
+        } else {
+            append_backward(bytes, val_union);
         }
     }
 }
