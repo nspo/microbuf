@@ -1,0 +1,6 @@
+version: 1
+append_checksum: yes
+content:
+  distance: float32[10]
+  angle: float32[10]
+  robot_id: uint8

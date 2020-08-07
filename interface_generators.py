@@ -268,7 +268,9 @@ class MatlabInterfaceGenerator:
         PlainTypes.uint8: ["uint8", "0", "microbuf.parse_uint8"],
         PlainTypes.uint16: ["uint16", "0", "microbuf.parse_uint16"],
         PlainTypes.uint32: ["uint32", "0", "microbuf.parse_uint32"],
-        PlainTypes.uint64: ["uint64", "0", "microbuf.parse_uint64"]
+        PlainTypes.uint64: ["uint64", "0", "microbuf.parse_uint64"],
+        PlainTypes.float32: ["float32", "0", "microbuf.parse_float32"],
+        PlainTypes.float64: ["float64", "0", "microbuf.parse_float64"],
     }
 
     def __init__(self, message: Message):
@@ -325,6 +327,9 @@ class MatlabInterfaceGenerator:
         deserial = "function [err, {}] = deserialize_{}(bytes, bytes_length)".format(
             ", ".join(f.name for f in self.message.fields), self.message.name)
         deserial += "\n"
+        deserial += "% deserialize_{} Parse microbuf message {} (version {})\n\n".format(self.message.name,
+                                                                                         self.message.name,
+                                                                                         self.message.version)
         deserial += "err = true;\n\n"
 
         for field in self.message.fields:
