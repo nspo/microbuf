@@ -45,6 +45,7 @@ content:
 ```
 
 When you now execute `./microbuf.py SensorData.mmsg`, serializers and deserializers for the supported languages will automatically be generated.
+You can use the serializers to convert data to bytes, send them to your receiver, and decode them there with the deserializers.
 
 
 ## How is data serialized?
