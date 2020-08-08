@@ -269,8 +269,8 @@ class MatlabInterfaceGenerator:
         PlainTypes.uint16: ["uint16", "0", "microbuf.parse_uint16"],
         PlainTypes.uint32: ["uint32", "0", "microbuf.parse_uint32"],
         PlainTypes.uint64: ["uint64", "0", "microbuf.parse_uint64"],
-        PlainTypes.float32: ["float32", "0", "microbuf.parse_float32"],
-        PlainTypes.float64: ["float64", "0", "microbuf.parse_float64"],
+        PlainTypes.float32: ["single", "0", "microbuf.parse_float32"],
+        PlainTypes.float64: ["double", "0", "microbuf.parse_float64"],
     }
 
     def __init__(self, message: Message):

@@ -30,7 +30,7 @@ int main(int argc, char **argv)
 
     // START of microbuf-specific code
     SensorData_struct_t sensor_data;
-    // fill in example data of SensorData msg
+    // fill example data into SensorData msg
     for(size_t i=0; i<10; ++i)
     {
         sensor_data.distance[i] = 2.5*static_cast<float>(i);
