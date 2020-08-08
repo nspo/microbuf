@@ -187,7 +187,7 @@ class CppInterfaceGenerator:
         return "{}.h".format(self.message.name)
 
     def gen_header_content(self):
-        return self._gen_head()+"\n\n"+self._gen_struct()+"\n\n"+self._gen_foot()
+        return self._gen_head()+"\n"+self._gen_struct()+"\n"+self._gen_foot()
 
     def _get_plain_cpp_data_type(self, field_type: str):
         """ Get the correct C++ data type for a microbuf plain data type """
@@ -201,13 +201,18 @@ class CppInterfaceGenerator:
         return "MICROBUF_MSG_{}_H".format(self.message.name.upper())
 
     def _gen_head(self):
-        with open("cpp_templates/head.h", "r") as f:
-            return f.read().format(include_guard_name=self._gen_include_guard_name(), message_name=self.message.name,
-                                   message_version=self.message.version)
+        s = "#ifndef {include_guard_name}\n"
+        s += "#define {include_guard_name}\n"
+        s += "// Microbuf Message: {message_name}\n"
+        s += "// Version {message_version}\n"
+        s += '#include "microbuf.h"\n'
+
+        return s.format(include_guard_name=self._gen_include_guard_name(), message_name=self.message.name,
+                        message_version=self.message.version)
 
     def _gen_foot(self):
-        with open("cpp_templates/foot.h", "r") as f:
-            return f.read().format(include_guard_name=self._gen_include_guard_name())
+        foot = "#endif // {include_guard_name}\n".format(include_guard_name=self._gen_include_guard_name())
+        return foot
 
     def _get_definition_line(self, field: MessageField):
         """ Generate C++ definition line of a field """
