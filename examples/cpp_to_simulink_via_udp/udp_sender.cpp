@@ -1,14 +1,19 @@
+// for sending UDP packets
 #include "boost/asio.hpp"
-#include "../../output/A.h" // include the automatically generated header file
+
+// include the automatically generated header file - microbuf must have been called before compiling!
+#include "../../output/SensorData.h"
 
 /**
- * Before compiling, make sure that boost-system is installed!
+ * Before compiling, make sure that boost-system (for easier UDP transmissions) is installed!
  * On Ubuntu/Debian:
  * $ sudo apt install libboost-system-dev
  *
  * When compiling, include microbuf cpp directory and
  * link against boost-system and pthread (only needed for network functions), e.g.:
  * $ g++ udp_sender.cpp -lboost_system -pthread -I ../../cpp -o udp_sender
+ * or use the Makefile:
+ * $ make
  */
 
 int main(int argc, char **argv)
@@ -24,15 +29,16 @@ int main(int argc, char **argv)
     remote_endpoint = ip::udp::endpoint(ip::address::from_string("127.0.0.1"), 25000);
 
     // START of microbuf-specific code
-    A_struct_t a_obj;
-    // fill in data of A msg
-    a_obj.foo = 123;
-    a_obj.bar = 22123;
-    a_obj.my_vector[0] = 10;
-    a_obj.my_vector[1] = 20;
-    a_obj.my_vector[2] = 30;
+    SensorData_struct_t sensor_data;
+    // fill in example data of SensorData msg
+    for(size_t i=0; i<10; ++i)
+    {
+        sensor_data.distance[i] = 2.5*static_cast<float>(i);
+        sensor_data.angle[i] = 4.2*static_cast<float>(i);
+    }
+    sensor_data.robot_id = 42U;
 
-    const auto bytes = a_obj.as_bytes(); // convert to bytes
+    const auto bytes = sensor_data.as_bytes(); // convert to bytes
     // END of microbuf-specific code
 
     boost::system::error_code err;

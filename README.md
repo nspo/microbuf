@@ -1,6 +1,8 @@
 # microbuf
 Data serialization toolchain for C++ and embedded systems with MATLAB support
 
+![Usage of microbuf](doc/microbuf-principle.png)
+
 ## Who might want to use `microbuf`?
 You might want to use it if you plan to create an interface between a computer and an embedded system with MATLAB support, possibly using network protocols like TCP or UDP. 
 One possible use case would be "Send control data from computer over UDP to embedded system". 
@@ -17,8 +19,8 @@ is possible.
 ## What kind of data can be sent?
 The following data types are currently supported:
  - `boolean`
- - Unsigned integers: `uint8_t`, `uint16_t`, `uint32_t`, and `uint64_t`
- - Floating point: `float32_t`, `float64_t`
+ - Unsigned integers: `uint8`, `uint16`, `uint32`, and `uint64`
+ - Floating point: `float32`, `float64`
  - Arrays of the above with a static size
  
 ## What languages are supported?
@@ -28,6 +30,8 @@ The following data types are currently supported:
 | C++ | ✔ | ✘ | ✔ | Needs `std::vector` right now |
 | MATLAB | ✘ | ✔ | ✔ |Usable in Simulink; compiles with Simulink/MATLAB Coder |
 | ... | ✘ | ✘ | ✘ | Please open a feature request or PR for new target languages |
+
+The Endianness of the systems will automatically be considered during compilation.
 
 ## How does it work?
 `microbuf` uses message description files ending with `.mmsg` for describing the structure
@@ -45,12 +49,11 @@ content:
 ```
 
 When you now execute `./microbuf.py SensorData.mmsg`, serializers and deserializers for the supported languages will automatically be generated.
-You can use the serializers to convert data to bytes, send them to your receiver, and decode them there with the deserializers.
+You can use the serializers to convert data to bytes, send them to your receiver (e.g. via TCP or UDP), and decode them there with the deserializers.
 
-
-## How is data serialized?
-The serialization which `microbuf` does is based on the 
-[MessagePack](https://github.com/msgpack/msgpack/blob/master/spec.md) specification.
+## How is the data serialized?
+`microbuf`'s serialization is based on the 
+[MessagePack specification](https://github.com/msgpack/msgpack/blob/master/spec.md).
 All data elements are packed into a flat array and an optional CRC16 checksum is appended.
 
 ## Example: Computer to MicroAutoBox
