@@ -9,7 +9,7 @@
 namespace microbuf {
     namespace internal {
         bool is_big_endian() {
-            uint16_t num = 1;
+            const uint16_t num = 1;
             if (*(uint8_t *) &num == 1) { // could be rewritten with bytes_union
                 // Little Endian
                 return false;
@@ -25,6 +25,8 @@ namespace microbuf {
             T val;
             uint8_t bytes[sizeof(T)];
         };
+
+        // append_forward and append_backward could be combined to a function which checks the Endianness itself
 
         template <typename T>
         void append_forward(std::vector<uint8_t>& bytes, const T& union_data) {
@@ -75,15 +77,48 @@ namespace microbuf {
             }
             return (crc);
         }
-    }
+    } // namespace microbuf::internal
 
-    void append_array(std::vector<uint8_t>& bytes, const size_t length) {
+    template <class T, size_t N>
+    struct array {
+        // Statically-sized array - basically like std::array, but does not need the STL
+        // Compare https://arduino.stackexchange.com/a/69178
+
+        T data[N];
+
+        static size_t size() { return N; }
+        using type = T;
+
+        T &operator[](size_t index) { return data[index]; }
+        const T &operator[](size_t index) const { return data[index]; }
+
+        T *begin() { return &data[0]; }
+        const T *begin() const { return &data[0]; }
+        T *end() { return &data[N]; }
+        const T *end() const { return &data[N]; }
+
+        bool operator==(const array<T, N> &rhs) const {
+            if (this == &rhs) {
+                return true;
+            }
+            for (size_t i = 0; i < N; ++i) {
+                if ((*this)[i] != rhs[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        bool operator!=(const array<T, N> &rhs) const {
+            return !(*this == rhs);
+        }
+    };
+
+    void append_array(std::vector<uint8_t>& bytes, const uint32_t length) {
         // add array to end of data
 
         using namespace internal;
 
         assert(length > 0);
-        // TODO: also check for max size?
 
         if (length <= 15) {
             // fixarray
