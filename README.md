@@ -49,7 +49,7 @@ content:
   robot_id: uint8
 ```
 
-When you now execute `./microbuf.py SensorData.mmsg`, serializers and deserializers for the supported languages will automatically be generated.
+When you now execute `python3 microbuf.py SensorData.mmsg`, serializers and deserializers for the supported languages will automatically be generated.
 You can use the serializers to convert data to bytes, send them to your receiver (e.g. via TCP or UDP), and decode them there with the deserializers.
 
 ## How is the data serialized?
@@ -69,7 +69,7 @@ cd microbuf
 - Try `microbuf` with the example message: `python3 microbuf.py SensorData.mmsg`
 
 ## Example: C++ application to Simulink
-Suppose you want to send the message `SensorData.mmsg` mentioned above from a computer (using C++, e.g. a ROS node) to a Simulink simulation.
+Suppose you want to send the message `SensorData.mmsg` mentioned above from a computer (using C++) to a Simulink simulation.
 `microbuf` will generate a header file `SensorData.h` which you can include in your C++ code.
 This message header file needs access to the `microbuf.h` header file, so just copy both files to the same folder where your compiler will find them or adapt your `CMakeLists.txt`.
 You can then use the struct `SensorData_struct_t` in C++ to fill in your data and convert them to a byte vector, e.g. like this:
@@ -98,6 +98,8 @@ By adding the file `deserialize_SensorData.m` which `microbuf` generated to the 
 
 Note that in order to simulate or compile such a model, the `matlab` folder of `microbuf` needs to be on your MATLAB path because it contains necessary functionality which is not included in `deserialize_SensorData.m`.
 You can of course also just copy the contained `+microbuf` folder to a place in your project which is on your MATLAB path anyway. 
+
+The `examples` folder also contains the [full Simulink model](examples/cpp_to_simulink_via_udp/udp_receiver.slx).
 
 ## Example: ROS C++ node to dSPACE MicroAutoBox
 Largely the same things need to done for this example as for the previous one.
