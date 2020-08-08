@@ -57,6 +57,17 @@ You can use the serializers to convert data to bytes, send them to your receiver
 [MessagePack specification](https://github.com/msgpack/msgpack/blob/master/spec.md).
 All data elements are packed into a flat array and an optional CRC16 checksum is appended.
 
+## Installation
+- Clone or download the repository contents and open a terminal in there:
+```bash
+git clone https://github.com/nspo/microbuf.git
+cd microbuf
+```
+- Make sure the requirements (only `pyyaml` at the time of writing) are installed:
+  - On Ubuntu/Debian systems: `sudo apt install python3-yaml`
+  - Using `pip`: `pip3 install -r requirements.txt`
+- Try `microbuf` with the example message: `python3 microbuf.py SensorData.mmsg`
+
 ## Example: C++ application to Simulink
 Suppose you want to send the message `SensorData.mmsg` mentioned above from a computer (using C++, e.g. a ROS node) to a Simulink simulation.
 `microbuf` will generate a header file `SensorData.h` which you can include in your C++ code.
