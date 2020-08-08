@@ -11,11 +11,13 @@ This makes it possible to e.g. send data from a [ROS](https://www.ros.org/) node
 The Endianness of the systems will automatically be considered during compilation.
 Due to the structure of the project, support for more languages can be added with reasonable effort.
 
-## Why not just use `protobuf`/`JSON`/...?
+## Why not just use `protobuf`/`JSON`/`matlab-msgpack`/...?
 Using another framework with more features like [protobuf](https://github.com/protocolbuffers/protobuf) may indeed make sense in many cases.
 `microbuf` is intended for use cases with strong limitations, e.g. embedded systems.
 `microbuf` does not depend on external libraries and a compilation just using standard language tools
 is possible.
+
+[matlab-msgpack by bastibe](https://github.com/bastibe/matlab-msgpack) cannot be compiled to C code with Simulink/MATLAB coder.
 
 ## What kind of data can be sent?
 The following data types are currently supported:
