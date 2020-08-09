@@ -1,83 +1,10 @@
 #ifndef MICROBUF_MICROBUF_H
 #define MICROBUF_MICROBUF_H
 
-#include <cstdint>
-#include <cassert>
-#include <vector>
-#include <climits>
+#include <stdint.h>
+#include <limits.h>
 
 namespace microbuf {
-    namespace internal {
-        bool is_big_endian() {
-            const uint16_t num = 1;
-            if (*(uint8_t *) &num == 1) { // could be rewritten with bytes_union
-                // Little Endian
-                return false;
-            } else {
-                // Big Endian
-                return true;
-            }
-        }
-
-        template <typename T>
-        union bytes_union {
-            // makes data types accessible as byte array - used for Endian-correct serialization
-            T val;
-            uint8_t bytes[sizeof(T)];
-        };
-
-        // append_forward and append_backward could be combined to a function which checks the Endianness itself
-
-        template <typename T>
-        void append_forward(std::vector<uint8_t>& bytes, const T& union_data) {
-            // append data in same order as currently in memory (i.e. it's already Big-Endian in memory)
-            for(size_t i=0; i<sizeof(T); ++i) {
-                bytes.push_back(union_data.bytes[i]);
-            }
-        }
-
-        template <typename T>
-        void append_backward(std::vector<uint8_t>& bytes, const T& union_data) {
-            // append data in reverse order (i.e. it's Little-Endian in memory)
-            for(size_t i=0; i<sizeof(T); ++i) {
-                bytes.push_back(union_data.bytes[sizeof(T)-1-i]);
-            }
-        }
-
-        uint16_t crc16_aug_ccitt(const uint8_t *ptr, uint32_t count) {
-            // Return CRC16/AUG-CCITT (https://reveng.sourceforge.io/crc-catalogue/16.htm)
-            // width=16 poly=0x1021 init=0x1d0f refin=false refout=false xorout=0x0000
-            // check=0xe5cc residue=0x0000 name="CRC-16/SPI-FUJITSU"
-            //
-            // Compare http://srecord.sourceforge.net/crc16-ccitt.html and
-            // https://hg.ulukai.org/ecm/crc16-t/file/f5262db9f5e0/test2.c#l40
-            uint16_t crc;
-            uint8_t i, v, ch;
-            crc = 0xFFFF;
-            while (count) {
-                ch = *ptr++;
-                i = 8;
-                v = 0x80;
-                do {
-                    if (crc & 0x8000)
-                        crc = (crc << 1) ^ 0x1021;
-                    else
-                        crc = (crc << 1);
-                    if (ch & v)
-                        crc ^= 1;
-                    v >>= 1;
-                } while (--i);
-                --count;
-            }
-            for (i = 0; i < 16; ++i) {
-                if (crc & 0x8000)
-                    crc = (crc << 1) ^ 0x1021;
-                else
-                    crc = (crc << 1);
-            }
-            return (crc);
-        }
-    } // namespace microbuf::internal
 
     template <class T, size_t N>
     struct array {
@@ -113,148 +40,206 @@ namespace microbuf {
         }
     };
 
-    void append_array(std::vector<uint8_t>& bytes, const uint32_t length) {
-        // add array to end of data
-
-        using namespace internal;
-
-        assert(length > 0);
-
-        if (length <= 15) {
-            // fixarray
-            bytes.push_back(length | 0x90U);
-        } else if (length <= 65535) {
-            // array 16
-            bytes.push_back(0xdc);
-
-            bytes_union<uint16_t> length_union {};
-            length_union.val = length;
-
-            if(is_big_endian()) {
-                append_forward(bytes, length_union);
-            } else {
-                append_backward(bytes, length_union);
-            }
-        } else {
-            // array 32
-            bytes.push_back(0xdd);
-
-            bytes_union<uint32_t> length_union {};
-            length_union.val = length;
-
-            if(is_big_endian()) {
-                append_forward(bytes, length_union);
-            } else {
-                append_backward(bytes, length_union);
-            }
-        }
+    // insert all bytes in source into dest at index - checked at compile time
+    template<size_t index, size_t dest_length, size_t source_length>
+    void insert_bytes(array<uint8_t,dest_length>& dest, const array<uint8_t,source_length>& source)
+    {
+        static_assert(index+source_length <= dest_length, "Destination too small");
+        memcpy(dest.begin()+index, source.begin(), source_length);
     }
 
-    void append_float32(std::vector<uint8_t>& bytes, const float f) {
-        // add float32 to end of data
-        using namespace internal;
+    namespace internal {
+        bool is_big_endian() {
+            const uint16_t num = 1;
+            if (*(uint8_t *) &num == 1) { // could be rewritten with bytes_union
+                // Little Endian
+                return false;
+            } else {
+                // Big Endian
+                return true;
+            }
+        }
 
+        template <typename T>
+        union bytes_union {
+            // makes data types accessible as byte array - used for Endian-correct serialization
+            T val;
+            array<uint8_t,sizeof(T)> bytes;
+        };
+
+        // Return a Big Endian representation of the input depending on the system's Endianness
+        // I.e. if system is Little Endian, reverse byte order
+        template<size_t N>
+        array<uint8_t, N> make_big_endian(const array<uint8_t,N>& bytes)
+        {
+            if(is_big_endian()) {
+                return bytes;
+            } else {
+                // Little Endian - reverse order of bytes
+                array<uint8_t, N> reversed_bytes {};
+                for(size_t i=0; i<bytes.size(); ++i) {
+                    reversed_bytes[bytes.size()-1-i] = bytes[i];
+                }
+                return reversed_bytes;
+            }
+        }
+
+        // Convert POD type to Big Endian representation with msgpack prefix
+        template<typename T>
+        array<uint8_t, sizeof(T)+1> to_msgpack_data(const T& data, const uint8_t prefix) {
+            array<uint8_t, sizeof(T)+1> bytes {}; // storage for prefix+data
+            bytes[0] = prefix;
+
+            bytes_union<T> val_union {};
+            val_union.val = data;
+            insert_bytes<1>(bytes, make_big_endian(val_union.bytes)); // insert Big Endian bytes after prefix
+            return bytes;
+        }
+
+
+        uint16_t crc16_aug_ccitt(const uint8_t *ptr, uint32_t count) {
+            // Return CRC16/AUG-CCITT (https://reveng.sourceforge.io/crc-catalogue/16.htm)
+            // width=16 poly=0x1021 init=0x1d0f refin=false refout=false xorout=0x0000
+            // check=0xe5cc residue=0x0000 name="CRC-16/SPI-FUJITSU"
+            //
+            // Compare http://srecord.sourceforge.net/crc16-ccitt.html and
+            // https://hg.ulukai.org/ecm/crc16-t/file/f5262db9f5e0/test2.c#l40
+            uint16_t crc;
+            uint8_t i, v, ch;
+            crc = 0xFFFF;
+            while (count) {
+                ch = *ptr++;
+                i = 8;
+                v = 0x80;
+                do {
+                    if (crc & 0x8000)
+                        crc = (crc << 1) ^ 0x1021;
+                    else
+                        crc = (crc << 1);
+                    if (ch & v)
+                        crc ^= 1;
+                    v >>= 1;
+                } while (--i);
+                --count;
+            }
+            for (i = 0; i < 16; ++i) {
+                if (crc & 0x8000)
+                    crc = (crc << 1) ^ 0x1021;
+                else
+                    crc = (crc << 1);
+            }
+            return (crc);
+        }
+
+    // Generate multiple plain microbuf fields after each other from an array
+    // MultipleGeneratorClass is needed b/c function templates cannot be partially specialized but classes can
+    template<size_t num_elements, size_t each_length, typename T>
+    struct MultipleGeneratorClass {
+        static array<uint8_t,num_elements*each_length> gen_multiple(const T* source_array, array<uint8_t,each_length> (*gen_element)(T))
+        {
+            array<uint8_t,num_elements*each_length> bytes;
+            // fill current element and then recurse
+            insert_bytes<0>(bytes, gen_element(source_array[0]));
+            insert_bytes<0+each_length>(bytes, MultipleGeneratorClass<num_elements-1,each_length,T>::gen_multiple(source_array+1, gen_element));
+            return bytes;
+        }
+    };
+
+    // Partial specialization to stop the recursion
+    template<size_t each_length, typename T>
+    struct MultipleGeneratorClass<1,each_length,T> {
+        static array<uint8_t,each_length> gen_multiple(const T* source_array, array<uint8_t,each_length> (*gen_element)(T))
+        {
+            array<uint8_t,each_length> bytes;
+            // fill in only 1 element and return
+            insert_bytes<0>(bytes, gen_element(source_array[0]));
+            return bytes;
+        }
+    };
+
+    } // namespace microbuf::internal
+
+    // Generate multiple plain microbuf fields after each other from an array
+    // This will not put a msgpack array around the result
+    // Note that it is NOT automatically checked at compile-time that source_array actually has num_elements!
+    template<size_t num_elements, size_t each_length, typename T>
+    array<uint8_t,num_elements*each_length> gen_multiple(const T* source_array, array<uint8_t,each_length> (*gen_element)(T)) {
+        return internal::MultipleGeneratorClass<num_elements,each_length,T>::gen_multiple(source_array, gen_element);
+    }
+
+    // Generate fixarray
+    // 0 < length <= 15
+    array<uint8_t, 1> gen_fixarray(const uint8_t length) {
+        return { static_cast<uint8_t>(length | 0x90U) };
+    }
+
+    // Generate array16
+    // 0 < length <= 65535
+    array<uint8_t, 3> gen_array16(const uint16_t length) {
+        using namespace internal;
+        return to_msgpack_data(length, 0xdc);
+    }
+
+    // Generate array32
+    // 0 < length <= 4294967295
+    array<uint8_t, 5> gen_array32(const uint32_t length) {
+        using namespace internal;
+        return to_msgpack_data(length, 0xdd);
+    }
+
+    // TODO: __SIZEOF_{FLOAT,DOUBLE}__ is non-standard
+    #if !defined __SIZEOF_FLOAT__ || __SIZEOF_FLOAT__ == 4
+    array<uint8_t,5> gen_float32(const float f) {
+        using namespace internal;
         static_assert(sizeof(float) * CHAR_BIT == 32, "System must have 32-bit floats");
-
-        bytes.push_back(0xca);
-
-        bytes_union<float> float_union {};
-        float_union.val = f;
-        if(is_big_endian()) {
-            append_forward(bytes, float_union);
-        } else {
-            append_backward(bytes, float_union);
-        }
+        return to_msgpack_data(f, 0xca);
     }
+    #endif
 
-    void append_float64(std::vector<uint8_t>& bytes, const double d) {
-        // add float64 to end of data
+    // E.g. some Arduino platforms have 4-byte doubles
+    #if !defined __SIZEOF_DOUBLE__ || __SIZEOF_DOUBLE__ == 8
+    array<uint8_t, 9>  gen_float64(const double d) {
         using namespace internal;
-
         static_assert(sizeof(double) * CHAR_BIT == 64, "System must have 64-bit doubles");
+        return to_msgpack_data(d, 0xcb);
+    }
+    #endif
 
-        bytes.push_back(0xcb);
-
-        bytes_union<double> double_union {};
-        double_union.val = d;
-        if(is_big_endian()) {
-            append_forward(bytes, double_union);
-        } else {
-            append_backward(bytes, double_union);
-        }
+    array<uint8_t, 2> gen_uint8(const uint8_t val) {
+        return {0xcc, val};
     }
 
-    void append_uint8(std::vector<uint8_t>& bytes, const uint8_t val) {
-        // add uint8 to end of data
+    array<uint8_t, 3>  gen_uint16(const uint16_t val) {
         using namespace internal;
-
-        bytes.push_back(0xcc);
-        bytes.push_back(val);
+        return to_msgpack_data(val, 0xcd);
     }
 
-    void append_uint16(std::vector<uint8_t>& bytes, const uint16_t val) {
-        // add uint16 to end of data
+    array<uint8_t, 5> gen_uint32(const uint32_t val) {
         using namespace internal;
-
-        bytes.push_back(0xcd);
-
-        bytes_union<uint16_t> val_union {};
-        val_union.val = val;
-        if(is_big_endian()) {
-            append_forward(bytes, val_union);
-        } else {
-            append_backward(bytes, val_union);
-        }
+        return to_msgpack_data(val, 0xce);
     }
 
-    void append_uint32(std::vector<uint8_t>& bytes, const uint32_t val) {
-        // add uint32 to end of data
+    array<uint8_t, 9>  gen_uint64(const uint64_t val) {
         using namespace internal;
-
-        bytes.push_back(0xce);
-
-        bytes_union<uint32_t> val_union {};
-        val_union.val = val;
-        if(is_big_endian()) {
-            append_forward(bytes, val_union);
-        } else {
-            append_backward(bytes, val_union);
-        }
+        return to_msgpack_data(val, 0xcf);
     }
 
-    void append_uint64(std::vector<uint8_t>& bytes, const uint64_t val) {
-        // add uint64 to end of data
-        using namespace internal;
-
-        bytes.push_back(0xcf);
-
-        bytes_union<uint64_t> val_union {};
-        val_union.val = val;
-        if(is_big_endian()) {
-            append_forward(bytes, val_union);
-        } else {
-            append_backward(bytes, val_union);
-        }
-    }
-
-    void append_bool(std::vector<uint8_t>& bytes, const bool val) {
-        // add bool to end of data
-        using namespace internal;
-
+    array<uint8_t, 1> gen_bool(const bool val) {
         if(val) {
-            bytes.push_back(0xc3);
+            return { 0xc3 };
         } else {
-            bytes.push_back(0xc2);
+            return { 0xc2 };
         }
     }
 
-    void append_crc(std::vector<uint8_t>& bytes) {
-        // add CRC checksum to end of data
+    // Add CRC16 checksum to the end of bytes
+    // Will ignore the last three bytes for CRC calculation and put the uint16 CRC there
+    template<size_t N>
+    void append_crc(array<uint8_t,N>& bytes) {
         using namespace internal;
 
-        const uint16_t crc = internal::crc16_aug_ccitt(&bytes[0], bytes.size());
-
-        append_uint16(bytes, crc);
+        const uint16_t crc = internal::crc16_aug_ccitt(&bytes[0], N-3);
+        insert_bytes<N-3>(bytes, gen_uint16(crc));
     }
 }
 

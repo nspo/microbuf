@@ -141,6 +141,19 @@ class Message:
 
         return num
 
+    def get_main_array_type(self):
+        num_plain_fields = self.get_num_of_plain_fields()
+        if num_plain_fields <= ArrayTypes.max_length[ArrayTypes.fixarray]:
+            return ArrayTypes.fixarray
+        elif num_plain_fields <= ArrayTypes.max_length[ArrayTypes.array16]:
+            return ArrayTypes.array16
+        elif num_plain_fields <= ArrayTypes.max_length[ArrayTypes.array32]:
+            return ArrayTypes.array32
+        else:
+            logging.error("Too many plain fields ({}, excluding initial array) in message '{}'".format(num_plain_fields,
+                                                                                                       self.name))
+            sys.exit(1)
+
     def get_num_of_bytes(self):
         """ Calculate number of bytes needed to store this message (excluding a possible CRC value)
         """
@@ -149,17 +162,7 @@ class Message:
             num_bytes = num_bytes + field.get_num_of_bytes()
 
         # add size of leading array
-        num_plain_fields = self.get_num_of_plain_fields()
-        if num_plain_fields <= ArrayTypes.max_length[ArrayTypes.fixarray]:
-            num_bytes = num_bytes + ArrayTypes.storage_size[ArrayTypes.fixarray]
-        elif num_plain_fields <= ArrayTypes.max_length[ArrayTypes.array16]:
-            num_bytes = num_bytes + ArrayTypes.storage_size[ArrayTypes.array16]
-        elif num_plain_fields <= ArrayTypes.max_length[ArrayTypes.array32]:
-            num_bytes = num_bytes + ArrayTypes.storage_size[ArrayTypes.array32]
-        else:
-            logging.error("Too many plain fields ({}, excluding initial array) in message '{}'".format(num_plain_fields,
-                                                                                                       self.name))
-            sys.exit(1)
+        num_bytes = num_bytes + ArrayTypes.storage_size[self.get_main_array_type()]
 
         if self.append_checksum:
             # also count checksum field at the end b/c it needs storage space
@@ -171,13 +174,19 @@ class Message:
 class CppInterfaceGenerator:
     DATA_TYPE_LOOKUP = {
         # microbuf data type: [C++ data type, C++ serialization method]
-        PlainTypes.bool: ["bool", "append_bool"],
-        PlainTypes.uint8: ["uint8_t", "append_uint8"],
-        PlainTypes.uint16: ["uint16_t", "append_uint16"],
-        PlainTypes.uint32: ["uint32_t", "append_uint32"],
-        PlainTypes.uint64: ["uint64_t", "append_uint64"],
-        PlainTypes.float32: ["float", "append_float32"],
-        PlainTypes.float64: ["double", "append_float64"]
+        PlainTypes.bool: ["bool", "gen_bool"],
+        PlainTypes.uint8: ["uint8_t", "gen_uint8"],
+        PlainTypes.uint16: ["uint16_t", "gen_uint16"],
+        PlainTypes.uint32: ["uint32_t", "gen_uint32"],
+        PlainTypes.uint64: ["uint64_t", "gen_uint64"],
+        PlainTypes.float32: ["float", "gen_float32"],
+        PlainTypes.float64: ["double", "gen_float64"]
+    }
+
+    ARRAY_GEN_LOOKUP = {
+        ArrayTypes.fixarray: "gen_fixarray",
+        ArrayTypes.array16: "gen_array16",
+        ArrayTypes.array32: "gen_array32"
     }
 
     def __init__(self, message: Message):
@@ -224,13 +233,30 @@ class CppInterfaceGenerator:
         logging.error("No definition for field {}".format(field.name))
         sys.exit(1)
 
-    def _get_serialization_line(self, field_type: str, object_name: str):
-        """ Get the C++ serialization line of a plain or plain array field """
+    def _get_serialization_line_plain(self, field_type: str, object_name: str, byte_index: int):
+        """ Get the C++ serialization line of a plain field """
         if field_type not in CppInterfaceGenerator.DATA_TYPE_LOOKUP:
             logging.error("Serialization for type {} is unknown".format(field_type))
             sys.exit(1)
 
-        return "microbuf::{}(bytes, {});".format(CppInterfaceGenerator.DATA_TYPE_LOOKUP[field_type][1], object_name)
+        return "microbuf::insert_bytes<{}>(bytes, microbuf::{}({}));".format(
+            byte_index, CppInterfaceGenerator.DATA_TYPE_LOOKUP[field_type][1], object_name
+        )
+
+    def _get_serialization_line_plainarray(self, field_type: str, object_name: str, byte_index: int, num_elements: int):
+        """ Get the C++ serialization line of a plain array field """
+        if field_type not in CppInterfaceGenerator.DATA_TYPE_LOOKUP:
+            logging.error("Serialization for type {} is unknown".format(field_type))
+            sys.exit(1)
+
+        return "microbuf::insert_bytes<{}>(bytes, microbuf::gen_multiple<{}>({}, microbuf::{}));".format(
+            byte_index, num_elements, object_name, CppInterfaceGenerator.DATA_TYPE_LOOKUP[field_type][1]
+        )
+
+    def _gen_array_serialization_line(self):
+        return "microbuf::insert_bytes<0>(bytes, microbuf::{}({}));\n".format(
+            CppInterfaceGenerator.ARRAY_GEN_LOOKUP[self.message.get_main_array_type()],
+            self.message.get_num_of_plain_fields())
 
     def _gen_struct(self):
         S4 = "    " # spaces
@@ -240,17 +266,17 @@ class CppInterfaceGenerator:
 
         # add as_bytes() for serialization
         str_struct += S4+"\n"
-        str_struct += S4+"std::vector<uint8_t> as_bytes() const {\n"
-        str_struct += S4*2+"std::vector<uint8_t> bytes;\n"
-        str_struct += S4*2+"bytes.reserve({});\n".format(self.message.get_num_of_bytes())
-        str_struct += S4*2+"microbuf::append_array(bytes, {});\n".format(self.message.get_num_of_plain_fields())
+        str_struct += S4+"microbuf::array<uint8_t,{}> as_bytes() const {{\n".format(self.message.get_num_of_bytes())
+        str_struct += S4*2+"microbuf::array<uint8_t,{}> bytes {{}};\n".format(self.message.get_num_of_bytes())
+        str_struct += S4*2+self._gen_array_serialization_line()
+        byte_index = 0+ArrayTypes.storage_size[self.message.get_main_array_type()]
         for field in self.message.fields:
             if type(field) == MessageFieldPlain:
-                str_struct += S4*2+self._get_serialization_line(field.type, field.name)+"\n"
+                str_struct += S4*2+self._get_serialization_line_plain(field.type, field.name, byte_index)+"\n"
+                byte_index = byte_index + PlainTypes.storage_size[field.type]
             elif type(field) == MessageFieldPlainArray:
-                str_struct += S4*2+"for(size_t i=0; i<{}; ++i) {{\n".format(field.array_length)
-                str_struct += S4*3+self._get_serialization_line(field.type, field.name+"[i]")+"\n"
-                str_struct += S4*2+"}\n"
+                str_struct += S4*2+self._get_serialization_line_plainarray(field.type, field.name, byte_index, field.array_length)+"\n"
+                byte_index = byte_index + PlainTypes.storage_size[field.type]*field.array_length
             else:
                 logging.error("Unknown field object {}".format(field))
                 sys.exit(1)

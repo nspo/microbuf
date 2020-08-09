@@ -1,15 +1,18 @@
 # microbuf
-Data serialization toolchain for C++ and embedded systems with MATLAB support
+Data serialization toolchain for computers and embedded systems with C++ or MATLAB support
 
-![Usage of microbuf](doc/microbuf-principle.png)
+## Example use case
+![Example use case](doc/microbuf-principle.png)
 
 ## Who might want to use `microbuf`?
-You might want to use it if you plan to create an interface between a computer and an embedded system with MATLAB support, possibly using network protocols like TCP or UDP. 
+You might want to use it if you plan to create an interface between some device running a C++ application (a computer or microcontroller) and some device running (possibly compiled) MATLAB code.
 One possible use case would be "Send control data from computer over UDP to embedded system". 
 The number of supported languages is currently pretty limited - only C++ for serializing (Tx) and MATLAB for deserializing (Rx). 
-This makes it possible to e.g. send data from a [ROS](https://www.ros.org/) node to a [dSPACE MicroAutoBox](https://www.dspace.com/en/inc/home/products/hw/micautob/microautobox2.cfm).
+This makes it possible to e.g. send data from a [ROS](https://www.ros.org/) node to a [dSPACE MicroAutoBox](https://www.dspace.com/en/inc/home/products/hw/micautob/microautobox2.cfm) or from an Arduino to a Simulink simulation on a PC.
 The Endianness of the systems will automatically be considered during compilation.
 Due to the structure of the project, support for more languages can be added with reasonable effort.
+
+Support for message serialization on Arduino platforms was recently introduced but not yet tested except for compilability.
 
 ## Why not just use `protobuf`/`JSON`/`matlab-msgpack`/...?
 Using another framework with more features like [protobuf](https://github.com/protocolbuffers/protobuf) may indeed make sense in many cases.
@@ -30,7 +33,7 @@ The following data types are currently supported:
 
 | Language | Serialization | Deserialization | CRC support | Examples | Notes |
 |---|---|---|---|---|---|
-| C++ | ✔ | ✘ | ✔ | ROS node; C++ application | Needs `std::vector` right now |
+| C++ | ✔ | ✘ | ✔ | ROS node; C++ application; Arduino sketch | |
 | MATLAB | ✘ | ✔ | ✔ | dSPACE MicroAutoBox; Simulink simulation | Usable in Simulink; compiles with Simulink/MATLAB Coder |
 | ... | ✘ | ✘ | ✘ | | Please open a feature request or PR for new target languages |
 
@@ -65,8 +68,9 @@ cd microbuf
 ```
 - Make sure the requirements (only `pyyaml` at the time of writing) are installed:
   - On Ubuntu/Debian systems: `sudo apt install python3-yaml`
-  - Using `pip`: `pip3 install -r requirements.txt`
+  - Or using `pip`: `pip3 install -r requirements.txt`
 - Try `microbuf` with the example message: `python3 microbuf.py SensorData.mmsg`
+- In case you want to run the unit tests, you need to download the submodules: `git submodule update --init --recursive`
 
 ## Example: C++ application to Simulink
 Suppose you want to send the message `SensorData.mmsg` mentioned above from a computer (using C++) to a Simulink simulation.
@@ -111,8 +115,14 @@ A similar UDP Receive block is included in the RTI Ethernet (UDP) Blockset thoug
 Note that the maximum payload of UDP packets for this blockset is 1472 bytes, according to the documentation.
 The deserialization function can be included as in the previous example and will be compiled to C code automatically.
 
+## Example: Arduino to Simulink
+The headers which `microbuf` generates can easily be included in an Arduino sketch. 
+The code compiles as it does not require functionality from the `std` namespace.
+Possibly dependant on your specific Arduino hardware, `float64` data can probably not be serialized on the Arduino as `double`s may only have 32 bits.
+
+This examples is not yet finished - more information will follow.
+
 ## Limitations
 
-- Consider the maximum UDP payload for your usecase. `microbuf` knows the required number of bytes, see e.g. the `bytes.reserve(...)` call of the generated C++ struct's `as_bytes()` function.
-- The generated C++ header cannot be used with e.g. Arduinos at the moment as it requires `std::vector`. This can be fixed in the future though.
+- Consider the maximum payload for your usecase (e.g. the maximum UDP payload). `microbuf` knows the required number of bytes, see e.g. the return type of the generated C++ struct's `as_bytes()` function.
 - Only arrays with a static size are supported. You could only fill an array partially and add a field storing the number of valid elements though.

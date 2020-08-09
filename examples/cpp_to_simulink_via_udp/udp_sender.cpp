@@ -42,7 +42,7 @@ int main(int argc, char **argv)
     // END of microbuf-specific code
 
     boost::system::error_code err;
-    socket.send_to(buffer(bytes, bytes.size()), remote_endpoint, 0, err);
+    socket.send_to(buffer(&bytes[0], bytes.size()), remote_endpoint, 0, err);
 
     socket.close();
 }
