@@ -9,5 +9,6 @@ include_directories(../cpp/ ../output/
 
 add_executable(microbuf_tests
         test_serialization.cpp
+        test_deserialization.cpp
         )
 target_link_libraries(microbuf_tests gtest gtest_main)
