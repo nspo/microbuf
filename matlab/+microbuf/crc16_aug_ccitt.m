@@ -7,12 +7,12 @@ function [crc] = crc16_aug_ccitt(bytes, bytes_length)
 
 crc = uint16(hex2dec('1d0f'));
 for i=1:bytes_length
-    crc = bitxor(crc, bitsll(uint16(bytes(i)), 8)); % crc = crc ^ (bytes(i) << 8)
+    crc = bitxor(crc, bitshift(uint16(bytes(i)), 8)); % crc = crc ^ (bytes(i) << 8)
     for j=1:8
         if bitand(crc, hex2dec('8000')) > 0 % if(crc & 0x8000)
-            crc = bitxor(bitsll(crc, 1), hex2dec('1021')); % crc = (crc << 1) ^ 0x1021
+            crc = bitxor(bitshift(crc, 1), hex2dec('1021')); % crc = (crc << 1) ^ 0x1021
         else
-            crc = bitsll(crc, 1); % crc = crc << 1
+            crc = bitshift(crc, 1); % crc = crc << 1
         end
     end
 end

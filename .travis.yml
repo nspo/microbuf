@@ -6,6 +6,7 @@ addons:
       - ubuntu-toolchain-r-test
     packages:
       - g++-7
+      - octave
 
 before_script:
   - mkdir build
@@ -15,3 +16,5 @@ before_script:
 script:
   - make
   - test/microbuf_tests
+  - cd ../test/matlab
+  - octave-cli test_matlab.m
