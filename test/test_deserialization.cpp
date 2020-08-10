@@ -4,6 +4,28 @@
 #include "microbuf_debug.h"
 #include <iostream>
 
+TEST(microbuf_cpp_deserialization, fixarray)
+{
+    EXPECT_TRUE(microbuf::check_fixarray<0>(microbuf::array<uint8_t,1>{0x91}, 1));
+    EXPECT_TRUE(microbuf::check_fixarray<0>(microbuf::array<uint8_t,1>{0x9f}, 15));
+    EXPECT_FALSE(microbuf::check_fixarray<0>(microbuf::array<uint8_t,1>{0x9f}, 14));
+}
+
+TEST(microbuf_cpp_deserialization, array16)
+{
+    EXPECT_TRUE(microbuf::check_array16<0>(microbuf::array<uint8_t,3>{0xdc, 0x00, 0x01}, 1));
+    EXPECT_TRUE(microbuf::check_array16<0>(microbuf::array<uint8_t,3>{0xdc, 0xa4, 0x10}, 42000));
+    EXPECT_FALSE(microbuf::check_array16<0>(microbuf::array<uint8_t,3>{0xdc, 0xa4, 0x10}, 42001));
+}
+
+
+TEST(microbuf_cpp_deserialization, array32)
+{
+    EXPECT_TRUE(microbuf::check_array32<0>(microbuf::array<uint8_t,5>{0xdd, 0x00, 0x00, 0x00, 0x01}, 1));
+    EXPECT_TRUE(microbuf::check_array32<0>(microbuf::array<uint8_t,5>{0xdd, 0x00, 0x06, 0x68, 0xa0}, 420000));
+    EXPECT_FALSE(microbuf::check_array32<0>(microbuf::array<uint8_t,5>{0xdd, 0x00, 0x06, 0x68, 0xa0}, 420001));
+}
+
 TEST(microbuf_cpp_deserialization, uint8)
 {
     uint8_t result {};

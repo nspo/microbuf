@@ -10,6 +10,19 @@ TEST(microbuf_cpp_serialization, fixarray)
     EXPECT_EQ(microbuf::gen_fixarray(15), (microbuf::array<uint8_t,1>{0x9f}));
 }
 
+TEST(microbuf_cpp_serialization, array16)
+{
+    EXPECT_EQ(microbuf::gen_array16(1), (microbuf::array<uint8_t,3>{0xdc, 0x00, 0x01}));
+    EXPECT_EQ(microbuf::gen_array16(42000), (microbuf::array<uint8_t,3>{0xdc, 0xa4, 0x10}));
+}
+
+
+TEST(microbuf_cpp_serialization, array32)
+{
+    EXPECT_EQ(microbuf::gen_array32(1), (microbuf::array<uint8_t,5>{0xdd, 0x00, 0x00, 0x00, 0x01}));
+    EXPECT_EQ(microbuf::gen_array32(420000), (microbuf::array<uint8_t,5>{0xdd, 0x00, 0x06, 0x68, 0xa0}));
+}
+
 TEST(microbuf_cpp_serialization, boolean)
 {
     EXPECT_EQ(microbuf::gen_bool(true), (microbuf::array<uint8_t,1>{0xc3}));
@@ -74,6 +87,7 @@ TEST(microbuf_cpp_serialization, CRC16_AUG_CCITT)
     EXPECT_EQ(microbuf::internal::crc16_aug_ccitt((const uint8_t*)("1234567890"), 10), 0x57d8);
 
     std::vector<uint8_t> bytes {};
+    bytes.reserve(256);
     for(size_t i=0; i<256; ++i)
     {
         bytes.push_back('A');

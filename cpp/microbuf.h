@@ -158,6 +158,19 @@ namespace microbuf {
             return (crc);
         }
 
+    // Append second byte array to first
+    template<size_t N1,size_t N2>
+    array<uint8_t,N1+N2> combine(const array<uint8_t,N1>& bytes1, const array<uint8_t,N2>& bytes2) {
+        array<uint8_t,N1+N2> result {};
+        for(size_t i=0; i<N1; ++i) {
+            result[i] = bytes1[i];
+        }
+        for(size_t i=0; i<N2; ++i) {
+            result[N1+i] = bytes2[i];
+        }
+        return result;
+    }
+
     // Generate multiple plain microbuf fields after each other from an array
     // MultipleGeneratorClass is needed b/c function templates cannot be partially specialized but classes can
     template<size_t num_elements, size_t each_length, typename T>
