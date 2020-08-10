@@ -92,7 +92,7 @@ namespace microbuf {
             uint_type bytes;
         };
 
-        // Convert POD type to Big Endian representation with msgpack prefix
+        // Convert primitive type to Big Endian representation with msgpack prefix
         template<typename T>
         inline array<uint8_t, sizeof(T)+1> to_msgpack_data(const T& data, const uint8_t prefix) {
             array<uint8_t, sizeof(T)+1> bytes {}; // storage for prefix+data
@@ -110,7 +110,7 @@ namespace microbuf {
             return bytes;
         }
 
-        // Convert serialized msgpack data to POD type
+        // Convert serialized msgpack data to primitive type
         // Start reading at index in bytes
         template<size_t index,typename T,size_t N>
         inline bool from_msgpack_data(const array<uint8_t,N>& bytes, const uint8_t prefix, T& result) {
