@@ -26,6 +26,17 @@ TEST(microbuf_cpp_deserialization, array32)
     EXPECT_FALSE(microbuf::check_array32<0>(microbuf::array<uint8_t,5>{0xdd, 0x00, 0x06, 0x68, 0xa0}, 420001));
 }
 
+TEST(microbuf_cpp_deserialization, boolean)
+{
+    bool result {};
+    EXPECT_TRUE((microbuf::parse_bool<0>(microbuf::array<uint8_t,1>{0xc3}, result)));
+    EXPECT_EQ(result, true);
+    EXPECT_TRUE((microbuf::parse_bool<0>(microbuf::array<uint8_t,1>{0xc2}, result)));
+    EXPECT_EQ(result, false);
+    EXPECT_FALSE((microbuf::parse_bool<0>(microbuf::array<uint8_t,1>{0xc4}, result)));
+}
+
+
 TEST(microbuf_cpp_deserialization, uint8)
 {
     uint8_t result {};
@@ -61,4 +72,35 @@ TEST(microbuf_cpp_deserialization, uint64)
     EXPECT_EQ(result, 1234567890123456789U);
     EXPECT_TRUE((microbuf::parse_uint64<0>(microbuf::array<uint8_t,9>{0xcf, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, result)));
     EXPECT_EQ(result, 18446744073709551615U);
+}
+
+TEST(microbuf_cpp_deserialization, float32)
+{
+    float result {};
+    EXPECT_TRUE((microbuf::parse_float32<0>(microbuf::array<uint8_t,5>{0xca, 0x3f, 0x9d, 0x70, 0xa4}, result)));
+    EXPECT_EQ(result, static_cast<float>(1.23));
+    EXPECT_FALSE((microbuf::parse_float32<0>(microbuf::array<uint8_t,5>{0xcb, 0x3f, 0x9d, 0x70, 0xa4}, result)));
+}
+
+TEST(microbuf_cpp_deserialization, float64)
+{
+    double result {};
+    EXPECT_TRUE((microbuf::parse_float64<0>(microbuf::array<uint8_t,9>{0xcb, 0x40, 0x12, 0x3D, 0x70, 0xA3, 0xD7, 0x0A, 0x3D}, result)));
+    EXPECT_EQ(result, static_cast<double>(4.56));
+    EXPECT_FALSE((microbuf::parse_float64<0>(microbuf::array<uint8_t,9>{0xcc, 0x40, 0x12, 0x3D, 0x70, 0xA3, 0xD7, 0x0A, 0x3D}, result)));
+}
+
+TEST(microbuf_cpp_deserialization, verify_crc)
+{
+    const microbuf::array<uint8_t, 13> valid_bytes{0x91, 0xcf, 0x11, 0x22, 0x10, 0xf4, 0x7d, 0xe9, 0x81, 0x15, 0xcd,
+                                                   0x14, 0xe9};
+    microbuf::array<uint8_t,13> bytes = valid_bytes;
+
+    EXPECT_TRUE(microbuf::verify_crc(bytes));
+    bytes[0] = 0x90;
+    EXPECT_FALSE(microbuf::verify_crc(bytes));
+    bytes = valid_bytes; bytes[12] = 0xe8;
+    EXPECT_FALSE(microbuf::verify_crc(bytes));
+    bytes = valid_bytes; bytes[10] = 0xcc;
+    EXPECT_FALSE(microbuf::verify_crc(bytes));
 }

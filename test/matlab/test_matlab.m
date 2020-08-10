@@ -160,9 +160,9 @@ if microbuf.crc16_aug_ccitt(uint8('1234567890'), 10) ~= hex2dec('57d8')
 end
 
 % test is pretty slow
-% if microbuf.crc16_aug_ccitt(repmat(uint8('A'), 1, 256), 256) ~= hex2dec('e938')
-%     error('CRC error');
-% end
+if microbuf.crc16_aug_ccitt(repmat(uint8('A'), 1, 256), 256) ~= hex2dec('e938')
+    error('CRC error');
+end
 
 if microbuf.check_crc(uint8([hex2dec('cd') hex2dec('1d') hex2dec('0f')]), 3, 1) == true
     error('CRC error');

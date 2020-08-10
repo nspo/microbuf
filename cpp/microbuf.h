@@ -49,39 +49,48 @@ namespace microbuf {
     }
 
     namespace internal {
-        inline bool is_big_endian() {
-            const uint16_t num = 1;
-            if (*(uint8_t *) &num == 1) { // could be rewritten with bytes_union
-                // Little Endian
-                return false;
-            } else {
-                // Big Endian
-                return true;
-            }
-        }
-
         template <typename T>
         union bytes_union {
             // makes data types accessible as byte array - used for Endian-correct serialization
-            T val;
-            array<uint8_t,sizeof(T)> bytes;
+            // empty as default -> needs specialization
         };
 
-        // Swap the input's byte order if the system is Little Endian
-        template<size_t N>
-        inline array<uint8_t, N> swap_if_little_endian(const array<uint8_t,N>& bytes)
-        {
-            if(is_big_endian()) {
-                return bytes;
-            } else {
-                // Little Endian - reverse order of bytes
-                array<uint8_t, N> reversed_bytes {};
-                for(size_t i=0; i<bytes.size(); ++i) {
-                    reversed_bytes[bytes.size()-1-i] = bytes[i];
-                }
-                return reversed_bytes;
-            }
-        }
+        template<>
+        union bytes_union<float> {
+            using uint_type = uint32_t;
+            float val;
+            uint_type bytes;
+        };
+        template<>
+        union bytes_union<double> {
+            using uint_type = uint64_t;
+            double val;
+            uint_type bytes;
+        };
+        template<>
+        union bytes_union<uint8_t> {
+            using uint_type = uint8_t;
+            uint8_t val;
+            uint_type bytes;
+        };
+        template<>
+        union bytes_union<uint16_t> {
+            using uint_type = uint16_t;
+            uint16_t val;
+            uint_type bytes;
+        };
+        template<>
+        union bytes_union<uint32_t> {
+            using uint_type = uint32_t;
+            uint32_t val;
+            uint_type bytes;
+        };
+        template<>
+        union bytes_union<uint64_t> {
+            using uint_type = uint64_t;
+            uint64_t val;
+            uint_type bytes;
+        };
 
         // Convert POD type to Big Endian representation with msgpack prefix
         template<typename T>
@@ -91,19 +100,14 @@ namespace microbuf {
 
             bytes_union<T> val_union {};
             val_union.val = data;
-            insert_bytes<1>(bytes, swap_if_little_endian(val_union.bytes)); // insert Big Endian bytes after prefix
-            return bytes;
-        }
 
-        // Get an array of the data in bytes from index_start to index_end (NOT including it)
-        template<size_t index_start, size_t index_end, size_t N>
-        inline array<uint8_t,index_end-index_start> get_partial_array(const array<uint8_t,N>& bytes) {
-            static_assert(index_end > index_start, "index_end must be after index_start");
-            array<uint8_t,index_end-index_start> result {};
-            for(size_t i=0; i<index_end-index_start; ++i) {
-                result[i] = bytes[index_start+i];
+            // add as Big Endian - system's Endianness is irrelevant with this method
+            bytes[1] = static_cast<uint8_t>(val_union.bytes >> 8U*(sizeof(T)-1));
+            for(size_t i=1; i<(sizeof(T)); ++i) {
+                bytes[1+i] = static_cast<uint8_t>(val_union.bytes >> 8U*(sizeof(T)-1-i));
             }
-            return result;
+
+            return bytes;
         }
 
         // Convert serialized msgpack data to POD type
@@ -117,12 +121,28 @@ namespace microbuf {
             }
 
             bytes_union<T> val_union {};
-            val_union.bytes = swap_if_little_endian(get_partial_array<index+1,index+1+sizeof(T)>(bytes));
+
+            // Save from Big Endian input
+            val_union.bytes = static_cast<typename bytes_union<T>::uint_type>(bytes[index+1+0]) << 8U*(sizeof(T)-1);
+            for(size_t i=1; i<(sizeof(T)); ++i) {
+                val_union.bytes |= static_cast<typename bytes_union<T>::uint_type>(bytes[index+1+i]) << 8U*(sizeof(T)-1-i);
+            }
             result = val_union.val;
 
             return true;
         }
 
+        // TODO: unused - remove?
+        // Get an array of the data in bytes from index_start to index_end (NOT including it)
+        template<size_t index_start, size_t index_end, size_t N>
+        inline array<uint8_t,index_end-index_start> get_partial_array(const array<uint8_t,N>& bytes) {
+            static_assert(index_end > index_start, "index_end must be after index_start");
+            array<uint8_t,index_end-index_start> result {};
+            for(size_t i=0; i<index_end-index_start; ++i) {
+                result[i] = bytes[index_start+i];
+            }
+            return result;
+        }
 
         inline uint16_t crc16_aug_ccitt(const uint8_t *ptr, uint32_t count) {
             // Return CRC16/AUG-CCITT (https://reveng.sourceforge.io/crc-catalogue/16.htm)
@@ -139,69 +159,82 @@ namespace microbuf {
                 i = 8;
                 v = 0x80;
                 do {
-                    if (crc & 0x8000)
-                        crc = (crc << 1) ^ 0x1021;
+                    if (crc & 0x8000U)
+                        crc = static_cast<uint16_t>(crc << 1U) ^ 0x1021U;
                     else
-                        crc = (crc << 1);
+                        crc = (crc << 1U);
                     if (ch & v)
-                        crc ^= 1;
-                    v >>= 1;
+                        crc ^= 1U;
+                    v >>= 1U;
                 } while (--i);
                 --count;
             }
             for (i = 0; i < 16; ++i) {
-                if (crc & 0x8000)
-                    crc = (crc << 1) ^ 0x1021;
+                if (crc & 0x8000U)
+                    crc = static_cast<uint16_t>(crc << 1U) ^ 0x1021U;
                 else
-                    crc = (crc << 1);
+                    crc = (crc << 1U);
             }
             return (crc);
         }
 
-    // Append second byte array to first
-    template<size_t N1,size_t N2>
-    array<uint8_t,N1+N2> combine(const array<uint8_t,N1>& bytes1, const array<uint8_t,N2>& bytes2) {
-        array<uint8_t,N1+N2> result {};
-        for(size_t i=0; i<N1; ++i) {
-            result[i] = bytes1[i];
+        // TODO: unused - remove?
+        // Append second byte array to first
+        template<size_t N1,size_t N2>
+        array<uint8_t,N1+N2> combine(const array<uint8_t,N1>& bytes1, const array<uint8_t,N2>& bytes2) {
+            array<uint8_t,N1+N2> result {};
+            for(size_t i=0; i<N1; ++i) {
+                result[i] = bytes1[i];
+            }
+            for(size_t i=0; i<N2; ++i) {
+                result[N1+i] = bytes2[i];
+            }
+            return result;
         }
-        for(size_t i=0; i<N2; ++i) {
-            result[N1+i] = bytes2[i];
-        }
-        return result;
-    }
 
-    // Generate multiple plain microbuf fields after each other from an array
-    // MultipleGeneratorClass is needed b/c function templates cannot be partially specialized but classes can
-    template<size_t num_elements, size_t each_length, typename T>
-    struct MultipleGeneratorClass {
-        static array<uint8_t,num_elements*each_length> gen_multiple(const T* source_array, array<uint8_t,each_length> (*gen_element)(T))
-        {
-            array<uint8_t,num_elements*each_length> bytes;
-            // fill current element and then recurse
-            insert_bytes<0>(bytes, gen_element(source_array[0]));
-            insert_bytes<0+each_length>(bytes, MultipleGeneratorClass<num_elements-1,each_length,T>::gen_multiple(source_array+1, gen_element));
-            return bytes;
+        // Check if bytes1 at index1 contains bytes2
+        template<size_t index1, size_t N1, size_t N2>
+        inline bool bytes_equal(const array<uint8_t,N1>& bytes1, const array<uint8_t,N2> bytes2) {
+            static_assert(index1+N2 <= N1, "bytes2 does not fit into bytes1 when starting at index1");
+            for(size_t i=0; i<bytes2.size(); ++i) {
+                if(bytes1[index1+i] != bytes2[i]) {
+                    return false;
+                }
+            }
+            return true;
         }
-    };
 
-    // Partial specialization to stop the recursion
-    template<size_t each_length, typename T>
-    struct MultipleGeneratorClass<1,each_length,T> {
-        static array<uint8_t,each_length> gen_multiple(const T* source_array, array<uint8_t,each_length> (*gen_element)(T))
-        {
-            array<uint8_t,each_length> bytes;
-            // fill in only 1 element and return
-            insert_bytes<0>(bytes, gen_element(source_array[0]));
-            return bytes;
-        }
-    };
+        // Generate multiple plain microbuf fields after each other from an array
+        // MultipleGeneratorClass is needed b/c function templates cannot be partially specialized but classes can
+        template<size_t num_elements, size_t each_length, typename T>
+        struct MultipleGeneratorClass {
+            static array<uint8_t,num_elements*each_length> gen_multiple(const T* source_array, array<uint8_t,each_length> (*gen_element)(T))
+            {
+                array<uint8_t,num_elements*each_length> bytes;
+                // fill current element and then recurse
+                insert_bytes<0>(bytes, gen_element(source_array[0]));
+                insert_bytes<0+each_length>(bytes, MultipleGeneratorClass<num_elements-1,each_length,T>::gen_multiple(source_array+1, gen_element));
+                return bytes;
+            }
+        };
+
+        // Partial specialization to stop the recursion
+        template<size_t each_length, typename T>
+        struct MultipleGeneratorClass<1,each_length,T> {
+            static array<uint8_t,each_length> gen_multiple(const T* source_array, array<uint8_t,each_length> (*gen_element)(T))
+            {
+                array<uint8_t,each_length> bytes;
+                // fill in only 1 element and return
+                insert_bytes<0>(bytes, gen_element(source_array[0]));
+                return bytes;
+            }
+        };
 
     } // namespace microbuf::internal
 
     // Generate multiple plain microbuf fields after each other from an array
-    // This will not put a msgpack array around the result
-    // Note that it is NOT automatically checked at compile-time that source_array actually has num_elements!
+    // This will not put a msgpack array marker in the beginning
+    // WARNING: Note that it is NOT automatically checked at compile-time that source_array actually has num_elements!
     template<size_t num_elements, size_t each_length, typename T>
     inline array<uint8_t,num_elements*each_length> gen_multiple(const T* source_array, array<uint8_t,each_length> (*gen_element)(T)) {
         return internal::MultipleGeneratorClass<num_elements,each_length,T>::gen_multiple(source_array, gen_element);
@@ -234,6 +267,13 @@ namespace microbuf {
         static_assert(sizeof(float) * CHAR_BIT == 32, "System must have 32-bit floats");
         return to_msgpack_data(f, 0xca);
     }
+
+    template<size_t index,size_t N>
+    inline bool parse_float32(const array<uint8_t,N>& bytes, float& result) {
+        using namespace internal;
+        static_assert(sizeof(float) * CHAR_BIT == 32, "System must have 32-bit floats");
+        return from_msgpack_data<index>(bytes, 0xca, result);
+    }
     #endif
 
     // E.g. some Arduino platforms have 4-byte doubles
@@ -242,6 +282,13 @@ namespace microbuf {
         using namespace internal;
         static_assert(sizeof(double) * CHAR_BIT == 64, "System must have 64-bit doubles");
         return to_msgpack_data(d, 0xcb);
+    }
+
+    template<size_t index,size_t N>
+    inline bool parse_float64(const array<uint8_t,N>& bytes, double& result) {
+        using namespace internal;
+        static_assert(sizeof(double) * CHAR_BIT == 64, "System must have 64-bit doubles");
+        return from_msgpack_data<index>(bytes, 0xcb, result);
     }
     #endif
 
@@ -272,40 +319,21 @@ namespace microbuf {
         }
     }
 
-    // Add CRC16 checksum to the end of bytes
-    // Will ignore the last three bytes for CRC calculation and put the uint16 CRC there
-    template<size_t N>
-    inline void append_crc(array<uint8_t,N>& bytes) {
-        using namespace internal;
-
-        const uint16_t crc = internal::crc16_aug_ccitt(&bytes[0], N-3);
-        insert_bytes<N-3>(bytes, gen_uint16(crc));
-    }
-
-    // Check if bytes1 at index1 contains bytes2
-    template<size_t index1, size_t N1, size_t N2>
-    inline bool bytes_equal(const array<uint8_t,N1>& bytes1, const array<uint8_t,N2> bytes2) {
-        static_assert(index1+N2 <= N1, "bytes2 does not fit into bytes1 when starting at index1");
-        for(size_t i=0; i<bytes2.size(); ++i) {
-            if(bytes1[index1+i] != bytes2[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     template<size_t index,size_t N>
     inline bool check_fixarray(const array<uint8_t,N>& bytes, const uint8_t length) {
+        using namespace internal;
         return bytes_equal<index>(bytes, gen_fixarray(length));
     }
 
     template<size_t index,size_t N>
     inline bool check_array16(const array<uint8_t,N>& bytes, const uint16_t length) {
+        using namespace internal;
         return bytes_equal<index>(bytes, gen_array16(length));
     }
 
     template<size_t index,size_t N>
     inline bool check_array32(const array<uint8_t,N>& bytes, const uint32_t length) {
+        using namespace internal;
         return bytes_equal<index>(bytes, gen_array32(length));
     }
 
@@ -332,6 +360,48 @@ namespace microbuf {
         using namespace internal;
         return from_msgpack_data<index>(bytes, 0xcf, result);
     }
+
+    template<size_t index,size_t N>
+    inline bool parse_bool(const array<uint8_t,N>& bytes, bool& result) {
+        static_assert(index < N, "Array index out of bounds");
+        if(bytes[index] == 0xc3) {
+            result = true;
+            return true;
+        } else if(bytes[index] == 0xc2) {
+            result = false;
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    // Add CRC16 checksum to the end of bytes
+    // Will ignore the last three bytes for CRC calculation and put the uint16 CRC there
+    template<size_t N>
+    inline void append_crc(array<uint8_t,N>& bytes) {
+        using namespace internal;
+        static_assert(N>=3, "bytes must at least have space for checksum (3 bytes)");
+
+        const uint16_t crc = internal::crc16_aug_ccitt(&bytes[0], N-3);
+        insert_bytes<N-3>(bytes, gen_uint16(crc));
+    }
+
+    // Check CRC16 checksum at the end of bytes
+    // Will ignore the last three bytes for CRC calculation
+    template<size_t N>
+    inline bool verify_crc(const array<uint8_t,N>& bytes) {
+        using namespace internal;
+        static_assert(N>=3, "bytes must at least have space for checksum (3 bytes)");
+
+        const uint16_t expected_crc = internal::crc16_aug_ccitt(&bytes[0], N-3);
+        uint16_t crc{};
+        if(!parse_uint16<N-3>(bytes, crc)) {
+            return false;
+        }
+
+        return expected_crc == crc;
+    }
+
 }
 
 #endif //MICROBUF_MICROBUF_H
