@@ -1,24 +1,20 @@
 # microbuf
 Data serialization toolchain for computers and embedded systems with C++ or MATLAB support
 
-## Example use case
-![Example use case](doc/microbuf-principle.png)
+## Visualized use cases
+![Example use case](examples/microbuf-principle.png)
 
 ## Who might want to use `microbuf`?
-You might want to use it if you plan to create an interface between some device running a C++ application (a computer or microcontroller) and some device running (possibly compiled) MATLAB code.
+You might want to use it if you plan to create an interface between devices running a C++ application (a computer or embedded system) and/or devices running (possibly compiled) MATLAB code (Simulink on PC or embedded systems).
 One possible use case would be "Send control data from computer over UDP to embedded system". 
-The number of supported languages is currently pretty limited - only C++ for serializing (Tx) and MATLAB for deserializing (Rx). 
-This makes it possible to e.g. send data from a [ROS](https://www.ros.org/) node to a [dSPACE MicroAutoBox](https://www.dspace.com/en/inc/home/products/hw/micautob/microautobox2.cfm) or from an Arduino to a Simulink simulation on a PC.
-The Endianness of the systems will automatically be considered during compilation.
+The number of supported languages is currently limited - C++ for serializing and deserializing (Tx+Rx) and MATLAB for deserializing (Rx). 
+This makes it possible to e.g. send data from a [ROS](https://www.ros.org/) node to a [dSPACE MicroAutoBox](https://www.dspace.com/en/inc/home/products/hw/micautob/microautobox2.cfm), from an Arduino to a Simulink simulation on a PC, or exchange data between multiple Arduinos - without writing the interface code byte-by-byte or worrying about things like [endianness](https://en.wikipedia.org/wiki/Endianness).
 Due to the structure of the project, support for more languages can be added with reasonable effort.
-
-Support for message serialization on Arduino platforms was recently introduced but not yet tested except for compilability.
 
 ## Why not just use `protobuf`/`JSON`/`matlab-msgpack`/...?
 Using another framework with more features like [protobuf](https://github.com/protocolbuffers/protobuf) may indeed make sense in many cases.
-`microbuf` is intended for use cases with strong limitations, e.g. embedded systems.
-`microbuf` does not depend on external libraries and a compilation just using standard language tools
-is possible.
+`microbuf` is intended for use cases with strong limitations, e.g. embedded systems or similar environments with a constrained toolchain.
+`microbuf` does not depend on external libraries (or even functionality in the C++ `std` namespace) and a compilation just using standard language tools is possible.
 
 [matlab-msgpack by bastibe](https://github.com/bastibe/matlab-msgpack) cannot be compiled to C code with Simulink/MATLAB coder.
 
@@ -33,7 +29,7 @@ The following data types are currently supported:
 
 | Language | Serialization | Deserialization | CRC support | Examples | Notes |
 |---|---|---|---|---|---|
-| C++ | ✔ | ✘ | ✔ | ROS node; C++ application; Arduino sketch | |
+| C++ | ✔ | ✔ | ✔ | ROS node; C++ application; Arduino sketch | |
 | MATLAB | ✘ | ✔ | ✔ | dSPACE MicroAutoBox; Simulink simulation | Usable in Simulink; compiles with Simulink/MATLAB Coder |
 | ... | ✘ | ✘ | ✘ | | Please open a feature request or PR for new target languages |
 
@@ -53,7 +49,7 @@ content:
 ```
 
 When you now execute `python3 microbuf.py SensorData.mmsg`, serializers and deserializers for the supported languages will automatically be generated.
-You can use the serializers to convert data to bytes, send them to your receiver (e.g. via TCP or UDP), and decode them there with the deserializers.
+You can use the serializers to convert data to bytes, send them to your receiver (e.g. via UDP or I2C), and decode them there with the deserializers.
 
 ## How is the data serialized?
 `microbuf`'s serialization is based on the 
@@ -79,7 +75,7 @@ This message header file needs access to the `microbuf.h` header file, so just c
 You can then use the struct `SensorData_struct_t` in C++ to fill in your data and convert them to a byte vector, e.g. like this:
 
 ```cpp
-SensorData_struct_t sensor_data;
+SensorData_struct_t sensor_data {};
 // fill example data into SensorData msg
 for(size_t i=0; i<10; ++i)
 {
@@ -98,7 +94,7 @@ The Simulink simulation can be configured to receive the serialized bytes.
 This can be achieved e.g. with the [UDP Receive block](https://www.mathworks.com/help/dsp/ref/udpreceive.html) from the DSP System Toolbox.
 By adding the file `deserialize_SensorData.m` which `microbuf` generated to the Simulink model, you can then easily deserialize the received data:
 
-![Simulink deserialization](doc/simulink-deserialization.png)
+![Simulink deserialization](examples/cpp_to_simulink_via_udp/simulink-deserialization.png)
 
 Note that in order to simulate or compile such a model, the `matlab` folder of `microbuf` needs to be on your MATLAB path because it contains necessary functionality which is not included in `deserialize_SensorData.m`.
 You can of course also just copy the contained `+microbuf` folder to a place in your project which is on your MATLAB path anyway. 
@@ -115,14 +111,19 @@ A similar UDP Receive block is included in the RTI Ethernet (UDP) Blockset thoug
 Note that the maximum payload of UDP packets for this blockset is 1472 bytes, according to the documentation.
 The deserialization function can be included as in the previous example and will be compiled to C code automatically.
 
-## Example: Arduino to Simulink
+## Example: Arduino to Arduino
 The headers which `microbuf` generates can easily be included in an Arduino sketch. 
 The code compiles as it does not require functionality from the `std` namespace.
-Possibly dependant on your specific Arduino hardware, `float64` data can probably not be serialized on the Arduino as `double`s may only have 32 bits.
+Possibly dependant on your specific Arduino hardware, `float64` data can probably not be serialized on the Arduino as `double`s may only have 32 bits. When using the Wire (I2C) library, only 32 bytes can be transmitted in one step.
 
-This examples is not yet finished - more information will follow.
+One example of sending data from one Arduino to another via I2C can be found [here](examples/arduino_to_arduino_via_i2c).
+
+![Arduino 2 Serial Monitor output](examples/arduino_to_arduino_via_i2c/arduino_2_serialmonitor.png)
 
 ## Limitations
 
-- Consider the maximum payload for your usecase (e.g. the maximum UDP payload). `microbuf` knows the required number of bytes, see e.g. the return type of the generated C++ struct's `as_bytes()` function.
+- Consider the maximum payload for your usecase (e.g. the maximum UDP payload). `microbuf` knows the required number of bytes, see e.g. the constant `data_size` of the generated C++ struct. Known limits:
+    - dSPACE RTI Ethernet (UDP) Blockset: [1472 bytes](https://www.dspace.com/shared/data/pdf/2020/dSPACE-Ethernet-Blockset_Product-Information_2020-01_EN.pdf)
+    - Arduino Wire (I2C) library: 32 bytes (software constant)
 - Only arrays with a static size are supported. You could only fill an array partially and add a field storing the number of valid elements though.
+

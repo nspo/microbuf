@@ -9,11 +9,8 @@ if bytes_length < idx+2
 end
 
 if bytes(idx) == hex2dec('cd')
-    if microbuf.is_big_endian()
-        value = typecast(bytes(idx+1:idx+2), 'uint16');
-    else
-        value = typecast(flip(bytes(idx+1:idx+2)), 'uint16');
-    end
+    val_bytes = microbuf.from_big_endian(bytes(idx+1:idx+2));
+    value = typecast(val_bytes, 'uint16');
 
     idx = idx+3;
     err = false;

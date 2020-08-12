@@ -1,20 +1,53 @@
-dist: trusty
+dist: focal
 language: cpp
 addons:
   apt:
-    sources:
-      - ubuntu-toolchain-r-test
     packages:
       - g++-7
       - octave
+      - libboost-system-dev
+
+before_install: # download arduino
+  - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_1.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :1 -ac -screen 0 1280x1024x16"
+  - sleep 3
+  - export DISPLAY=:1.0
+  - wget http://downloads.arduino.cc/arduino-1.8.13-linux64.tar.xz
+  - tar xf arduino-1.8.13-linux64.tar.xz
+  - sudo mv arduino-1.8.13 /usr/local/share/arduino
+  - sudo ln -s /usr/local/share/arduino/arduino /usr/local/bin/arduino
 
 before_script:
+  - pip3 install -r requirements.txt
+
+script:
+  - echo "Basic message conversion (Python) and compiling (C++)"
+  - python3 microbuf.py SensorData.mmsg
+  - cd examples/cpp_to_simulink_via_udp/
+  - make
+  - cd ../..
+  - echo "MATLAB tests"
+  - cd test/matlab
+  - octave-cli test_matlab.m
+  - cd ../..
+  - echo "C++ tests"
   - mkdir build
   - cd build
   - cmake ..
-
-script:
   - make
   - test/microbuf_tests
-  - cd ../test/matlab
-  - octave-cli test_matlab.m
+  - cd ..
+  - echo "Arduino tests"
+  - cd examples/arduino
+  - ln -s ../../cpp/microbuf.h microbuf.h
+  - arduino --verify --board arduino:avr:uno basic_sketch.ino
+  - cd ../..
+  - python3 microbuf.py examples/arduino_to_arduino_via_i2c/ArduinoMessage.mmsg
+  - cd examples/arduino_to_arduino_via_i2c/arduino_1
+  - ln -s ../../../cpp/microbuf.h microbuf.h
+  - ln -s ../../../output/ArduinoMessage.h ArduinoMessage.h 
+  - arduino --verify --board arduino:avr:uno arduino_1.ino
+  - cd ../arduino_2
+  - ln -s ../../../cpp/microbuf.h microbuf.h
+  - ln -s ../../../output/ArduinoMessage.h ArduinoMessage.h 
+  - arduino --verify --board arduino:avr:uno arduino_2.ino
+  - cd ../../../

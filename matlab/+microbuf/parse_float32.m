@@ -8,11 +8,8 @@ if bytes_length < idx+4
 end
 
 if bytes(idx) == hex2dec('ca')
-    if microbuf.is_big_endian()
-        value = typecast(bytes(idx+1:idx+4), 'single');
-    else
-        value = typecast(flip(bytes(idx+1:idx+4)), 'single');
-    end
+    val_bytes = microbuf.from_big_endian(bytes(idx+1:idx+4));
+    value = typecast(val_bytes, 'single');
 
     idx = idx+5;
     err = false;

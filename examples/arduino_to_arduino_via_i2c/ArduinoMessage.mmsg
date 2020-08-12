@@ -1,0 +1,5 @@
+version: 1
+append_checksum: yes
+content:
+  message_counter: uint8
+  measured_values: float32[4]

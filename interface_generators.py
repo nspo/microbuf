@@ -174,19 +174,25 @@ class Message:
 class CppInterfaceGenerator:
     DATA_TYPE_LOOKUP = {
         # microbuf data type: [C++ data type, C++ serialization method]
-        PlainTypes.bool: ["bool", "gen_bool"],
-        PlainTypes.uint8: ["uint8_t", "gen_uint8"],
-        PlainTypes.uint16: ["uint16_t", "gen_uint16"],
-        PlainTypes.uint32: ["uint32_t", "gen_uint32"],
-        PlainTypes.uint64: ["uint64_t", "gen_uint64"],
-        PlainTypes.float32: ["float", "gen_float32"],
-        PlainTypes.float64: ["double", "gen_float64"]
+        PlainTypes.bool: ["bool", "gen_bool", "parse_bool"],
+        PlainTypes.uint8: ["uint8_t", "gen_uint8", "parse_uint8"],
+        PlainTypes.uint16: ["uint16_t", "gen_uint16", "parse_uint16"],
+        PlainTypes.uint32: ["uint32_t", "gen_uint32", "parse_uint32"],
+        PlainTypes.uint64: ["uint64_t", "gen_uint64", "parse_uint64"],
+        PlainTypes.float32: ["float", "gen_float32", "parse_float32"],
+        PlainTypes.float64: ["double", "gen_float64", "parse_float64"]
     }
 
     ARRAY_GEN_LOOKUP = {
         ArrayTypes.fixarray: "gen_fixarray",
         ArrayTypes.array16: "gen_array16",
         ArrayTypes.array32: "gen_array32"
+    }
+
+    ARRAY_CHECK_LOOKUP = {
+        ArrayTypes.fixarray: "check_fixarray",
+        ArrayTypes.array16: "check_array16",
+        ArrayTypes.array32: "check_array32"
     }
 
     def __init__(self, message: Message):
@@ -258,9 +264,13 @@ class CppInterfaceGenerator:
             CppInterfaceGenerator.ARRAY_GEN_LOOKUP[self.message.get_main_array_type()],
             self.message.get_num_of_plain_fields())
 
+    def _gen_return_on_error(self):
+        return "if(!worked) { return false; }"
+
     def _gen_struct(self):
         S4 = "    " # spaces
         str_struct = "struct {}_struct_t {{\n".format(self.message.name)
+        str_struct += S4+"static constexpr size_t data_size = {};\n\n".format(self.message.get_num_of_bytes())
         for field in self.message.fields:
             str_struct += S4 + self._get_definition_line(field) + "\n"
 
@@ -287,7 +297,37 @@ class CppInterfaceGenerator:
         str_struct += S4*2+"return bytes;\n"
         str_struct += S4+"}\n"
 
-        str_struct += "};\n"
+        # add from_bytes() for deserialization
+        str_struct += S4+"\n"
+        str_struct += S4+"bool from_bytes(const microbuf::array<uint8_t,{}>& bytes) {{\n".format(self.message.get_num_of_bytes())
+        str_struct += S4 * 2 + "bool worked = microbuf::{}<0>(bytes, {});\n".format(
+            CppInterfaceGenerator.ARRAY_CHECK_LOOKUP[self.message.get_main_array_type()],
+            self.message.get_num_of_plain_fields())
+        str_struct += S4*2+self._gen_return_on_error()+"\n"
+
+        byte_index = 0+ArrayTypes.storage_size[self.message.get_main_array_type()]
+        for field in self.message.fields:
+            if type(field) == MessageFieldPlain:
+                str_struct += S4 * 2 + "worked = microbuf::{}<{}>(bytes, {});\n".format(
+                    CppInterfaceGenerator.DATA_TYPE_LOOKUP[field.type][2], byte_index, field.name)
+                str_struct += S4 * 2 + self._gen_return_on_error() + "\n"
+                byte_index = byte_index + PlainTypes.storage_size[field.type]
+            elif type(field) == MessageFieldPlainArray:
+                str_struct += S4 * 2 + "worked = microbuf::parse_multiple<{},{}>(bytes, {}, microbuf::{}<0>);\n".format(
+                    field.array_length, byte_index, field.name, CppInterfaceGenerator.DATA_TYPE_LOOKUP[field.type][2])
+                str_struct += S4 * 2 + self._gen_return_on_error() + "\n"
+                byte_index = byte_index + PlainTypes.storage_size[field.type]*field.array_length
+            else:
+                logging.error("Unknown field object {}".format(field))
+                sys.exit(1)
+
+        if self.message.append_checksum:
+            str_struct += S4*2+"worked = microbuf::verify_crc(bytes);\n"
+
+        str_struct += S4*2+"return worked;\n"
+        str_struct += S4+"}\n"
+
+        str_struct += "};\n\n"
 
         return str_struct
 
@@ -302,6 +342,12 @@ class MatlabInterfaceGenerator:
         PlainTypes.uint64: ["uint64", "0", "microbuf.parse_uint64"],
         PlainTypes.float32: ["single", "0", "microbuf.parse_float32"],
         PlainTypes.float64: ["double", "0", "microbuf.parse_float64"],
+    }
+
+    ARRAY_CHECK_LOOKUP = {
+        ArrayTypes.fixarray: "check_fixarray",
+        ArrayTypes.array16: "check_array16",
+        ArrayTypes.array32: "check_array32"
     }
 
     def __init__(self, message: Message):
@@ -374,7 +420,8 @@ class MatlabInterfaceGenerator:
         deserial += "idx = 1;\n\n"
 
         # check initial array
-        deserial += "[idx, err] = microbuf.check_array(bytes, bytes_length, {}, idx);\n".format(
+        deserial += "[idx, err] = microbuf.{}(bytes, bytes_length, {}, idx);\n".format(
+            MatlabInterfaceGenerator.ARRAY_CHECK_LOOKUP[self.message.get_main_array_type()], # TODO: unchecked
             self.message.get_num_of_plain_fields())
         deserial += "if err ;return; end\n\n"
 

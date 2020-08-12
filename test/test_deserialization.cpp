@@ -104,3 +104,40 @@ TEST(microbuf_cpp_deserialization, verify_crc)
     bytes = valid_bytes; bytes[10] = 0xcc;
     EXPECT_FALSE(microbuf::verify_crc(bytes));
 }
+
+TEST(microbuf_cpp_deserialization, uint16_multi) {
+    uint16_t result[2]{};
+    EXPECT_TRUE((microbuf::parse_multiple<2, 1>(microbuf::array<uint8_t, 7>{0x00, 0xcd, 0x00, 0xff, 0xcd, 0x00, 0x0f},
+                                                result, microbuf::parse_uint16<0>)));
+    EXPECT_EQ(result[0], 255);
+    EXPECT_EQ(result[1], 15);
+}
+
+
+TEST(microbuf_cpp_deserialization, float32_multi) {
+    float result[3]{};
+    EXPECT_TRUE((microbuf::parse_multiple<3, 0>(
+            microbuf::array<uint8_t, 15>{0xca, 0x3f, 0x9d, 0x70, 0xa4, // 1.23
+                                         0xca, 0x40, 0x91, 0xeb, 0x85, // 4.56
+                                         0xca, 0x43, 0x00, 0x00, 0x00 // 128
+            },
+            result, microbuf::parse_float32<0>)));
+    EXPECT_EQ(result[0], static_cast<float>(1.23));
+    EXPECT_EQ(result[1], static_cast<float>(4.56));
+    EXPECT_EQ(result[2], static_cast<float>(128));
+
+    EXPECT_FALSE((microbuf::parse_multiple<3, 0>(
+            microbuf::array<uint8_t, 15>{0xca, 0x3f, 0x9d, 0x70, 0xa4, // 1.23
+                                         0xca, 0x40, 0x91, 0xeb, 0x85, // 4.56
+                                         0xcb, 0x43, 0x00, 0x00, 0x00 // 128 - wrong prefix
+            },
+            result, microbuf::parse_float32<0>)));
+
+    float result2[3]{};
+    EXPECT_FALSE((microbuf::parse_multiple_unsafe<3, 0>(
+            microbuf::array<uint8_t, 15>{0xca, 0x3f, 0x9d, 0x70, 0xa4, // 1.23
+                                         0xca, 0x40, 0x91, 0xeb, 0x85, // 4.56
+                                         0xcb, 0x43, 0x00, 0x00, 0x00 // 128 - wrong prefix
+            },
+            result2, microbuf::parse_float32<0>)));
+}

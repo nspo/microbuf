@@ -8,11 +8,8 @@ if bytes_length < idx+8
 end
 
 if bytes(idx) == hex2dec('cb')
-    if microbuf.is_big_endian()
-        value = typecast(bytes(idx+1:idx+8), 'double');
-    else
-        value = typecast(flip(bytes(idx+1:idx+8)), 'double');
-    end
+    val_bytes = microbuf.from_big_endian(bytes(idx+1:idx+8));
+    value = typecast(val_bytes, 'double');
 
     idx = idx+9;
     err = false;

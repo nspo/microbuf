@@ -116,4 +116,9 @@ TEST(microbuf_cpp_serialization, gen_multiple)
     EXPECT_EQ(microbuf::gen_multiple<3>(source_data2, microbuf::gen_float32),
               (microbuf::array<uint8_t, 15>{0xca, 0x3f, 0x9d, 0x70, 0xa4, 0xca, 0x40, 0x91, 0xeb, 0x85, 0xca, 0x40,
                                             0xfc, 0x7a, 0xe1}));
+
+    const float source_data3[] {1.23, 4.56, 7.89};
+    EXPECT_EQ(microbuf::gen_multiple_unsafe<3>(source_data3, microbuf::gen_float32),
+              (microbuf::array<uint8_t, 15>{0xca, 0x3f, 0x9d, 0x70, 0xa4, 0xca, 0x40, 0x91, 0xeb, 0x85, 0xca, 0x40,
+                                            0xfc, 0x7a, 0xe1}));
 }

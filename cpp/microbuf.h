@@ -102,8 +102,7 @@ namespace microbuf {
             val_union.val = data;
 
             // add as Big Endian - system's Endianness is irrelevant with this method
-            bytes[1] = static_cast<uint8_t>(val_union.bytes >> 8U*(sizeof(T)-1));
-            for(size_t i=1; i<(sizeof(T)); ++i) {
+            for(size_t i=0; i<(sizeof(T)); ++i) {
                 bytes[1+i] = static_cast<uint8_t>(val_union.bytes >> 8U*(sizeof(T)-1-i));
             }
 
@@ -123,8 +122,8 @@ namespace microbuf {
             bytes_union<T> val_union {};
 
             // Save from Big Endian input
-            val_union.bytes = static_cast<typename bytes_union<T>::uint_type>(bytes[index+1+0]) << 8U*(sizeof(T)-1);
-            for(size_t i=1; i<(sizeof(T)); ++i) {
+            val_union.bytes = 0;
+            for(size_t i=0; i<(sizeof(T)); ++i) {
                 val_union.bytes |= static_cast<typename bytes_union<T>::uint_type>(bytes[index+1+i]) << 8U*(sizeof(T)-1-i);
             }
             result = val_union.val;
@@ -137,6 +136,7 @@ namespace microbuf {
         template<size_t index_start, size_t index_end, size_t N>
         inline array<uint8_t,index_end-index_start> get_partial_array(const array<uint8_t,N>& bytes) {
             static_assert(index_end > index_start, "index_end must be after index_start");
+            static_assert(index_end <= N, "index_end must not be larger than size N");
             array<uint8_t,index_end-index_start> result {};
             for(size_t i=0; i<index_end-index_start; ++i) {
                 result[i] = bytes[index_start+i];
@@ -204,6 +204,45 @@ namespace microbuf {
             return true;
         }
 
+        // Needed data for parse_multiple
+        template<typename T>
+        struct ParsingInfo{};
+
+        template<>
+        struct ParsingInfo<bool>{
+            static const size_t num_bytes_serialized = 1;
+        };
+
+        template<>
+        struct ParsingInfo<uint8_t>{
+            static const size_t num_bytes_serialized = 2;
+        };
+
+        template<>
+        struct ParsingInfo<uint16_t>{
+            static const size_t num_bytes_serialized = 3;
+        };
+
+        template<>
+        struct ParsingInfo<uint32_t>{
+            static const size_t num_bytes_serialized = 5;
+        };
+
+        template<>
+        struct ParsingInfo<uint64_t>{
+            static const size_t num_bytes_serialized = 9;
+        };
+
+        template<>
+        struct ParsingInfo<float>{
+            static const size_t num_bytes_serialized = 5;
+        };
+
+        template<> // might not be used if doubles are not 64 bits
+        struct ParsingInfo<double>{
+            static const size_t num_bytes_serialized = 9;
+        };
+
         // Generate multiple plain microbuf fields after each other from an array
         // MultipleGeneratorClass is needed b/c function templates cannot be partially specialized but classes can
         template<size_t num_elements, size_t each_length, typename T>
@@ -236,9 +275,53 @@ namespace microbuf {
     // This will not put a msgpack array marker in the beginning
     // WARNING: Note that it is NOT automatically checked at compile-time that source_array actually has num_elements!
     template<size_t num_elements, size_t each_length, typename T>
-    inline array<uint8_t,num_elements*each_length> gen_multiple(const T* source_array, array<uint8_t,each_length> (*gen_element)(T)) {
+    inline array<uint8_t,num_elements*each_length> gen_multiple_unsafe(const T* source_array, array<uint8_t,each_length> (*gen_element)(T)) {
         return internal::MultipleGeneratorClass<num_elements,each_length,T>::gen_multiple(source_array, gen_element);
     }
+
+    // Generate multiple plain microbuf fields after each other from an array
+    // This will not put a msgpack array marker in the beginning
+    // Safe version for C-style arrays
+    template<size_t num_elements, size_t each_length, typename T>
+    inline array<uint8_t,num_elements*each_length> gen_multiple(const T (&source_array)[num_elements], array<uint8_t,each_length> (*gen_element)(T)) {
+        // implicitly checks size of source_array through num_elements
+        return internal::MultipleGeneratorClass<num_elements,each_length,T>::gen_multiple(source_array, gen_element);
+    }
+
+    // Parse multiple plain microbuf fields from source_arr at index to dest
+    // WARNING: This will not check dest's size!
+    template<size_t num_elements, size_t index, typename T, size_t N>
+    inline bool parse_multiple_unsafe(const array<uint8_t, N> &source_arr, T *dest, bool (*parse_element)(
+            const array<uint8_t, internal::ParsingInfo<T>::num_bytes_serialized> &, T &)) {
+        constexpr size_t num_bytes_serialized = internal::ParsingInfo<T>::num_bytes_serialized;
+        static_assert(index+num_elements*num_bytes_serialized <= N, "source_arr is too small");
+
+        for(size_t i=0; i<num_elements; ++i) {
+            const size_t curr_source_offset = index+i*num_bytes_serialized;
+
+            // TODO: will this copy be optimized away?
+            array<uint8_t,num_bytes_serialized> partial_arr {};
+            for(size_t j=0; j<num_bytes_serialized; ++j) {
+                partial_arr[j] = source_arr[curr_source_offset+j];
+            }
+
+            bool res = parse_element(partial_arr, dest[i]);
+            if(!res) { return false; }
+        }
+        return true;
+    }
+
+    // Parse multiple plain microbuf fields from source_arr at index to dest, check dest size
+    // Only for C-style array dests, safe
+    template<size_t num_elements, size_t index, typename T, size_t N>
+    inline bool parse_multiple(const array<uint8_t, N> &source_arr, T (&dest)[num_elements],
+                               bool (*parse_element)(
+                                       const array<uint8_t, internal::ParsingInfo<T>::num_bytes_serialized> &, T &)) {
+        // implicitly checks length of dest through template param num_elements
+        return parse_multiple_unsafe<num_elements, index>(source_arr, dest, parse_element);
+    }
+
+    // TODO: also implement parse_multiple and gen_multiple as safe methods for microbuf::array
 
     // Generate fixarray
     // 0 < length <= 15

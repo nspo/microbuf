@@ -29,7 +29,7 @@ int main(int argc, char **argv)
     remote_endpoint = ip::udp::endpoint(ip::address::from_string("127.0.0.1"), 25000);
 
     // START of microbuf-specific code
-    SensorData_struct_t sensor_data;
+    SensorData_struct_t sensor_data {};
     // fill example data into SensorData msg
     for(size_t i=0; i<10; ++i)
     {

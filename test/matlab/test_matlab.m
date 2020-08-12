@@ -1,36 +1,62 @@
 disp('Executing MATLAB microbuf deserialization tests');
 
-addpath('../../matlab');
+addpath(fullfile(fileparts(mfilename('fullpath')), "/../../matlab"));
 
 disp('- array tests...');
 
 disp('-- fixarray tests...');
 
 bytes = uint8([hex2dec('95')]);
-[idx, err] = microbuf.check_array(bytes, length(bytes), 5, 1);
+[idx, err] = microbuf.check_fixarray(bytes, length(bytes), 5, 1);
 if idx ~= 2 || err
     error('fixarray err');
 end
 
 bytes = uint8([hex2dec('9f')]);
-[idx, err] = microbuf.check_array(bytes, length(bytes), 15, 1);
+[idx, err] = microbuf.check_fixarray(bytes, length(bytes), 15, 1);
 if idx ~= 2 || err
     error('fixarray err');
 end
 
 bytes = uint8([hex2dec('90')]);
-[idx, err] = microbuf.check_array(bytes, length(bytes), 0, 1);
+[idx, err] = microbuf.check_fixarray(bytes, length(bytes), 0, 1);
 if idx ~= 2 || err
     error('fixarray err');
 end
 
 bytes = uint8([hex2dec('95')]);
-[idx, err] = microbuf.check_array(bytes, length(bytes), 6, 1);
+[idx, err] = microbuf.check_fixarray(bytes, length(bytes), 6, 1);
 if ~err
     error('fixarray err');
 end
 
-% TODO: array16, array32
+disp('-- array16 tests...');
+
+bytes = uint8([hex2dec('dc') 1 0]);
+[idx, err] = microbuf.check_array16(bytes, length(bytes), 256, 1);
+if idx ~= 4 || err
+    error('array16 err');
+end
+
+bytes = uint8([hex2dec('dc') 1]);
+[idx, err] = microbuf.check_array16(bytes, length(bytes), 256, 1);
+if ~err
+    error('array16 err');
+end
+
+disp('-- array32 tests...');
+
+bytes = uint8([hex2dec('dd') 1 0 0 0]);
+[idx, err] = microbuf.check_array32(bytes, length(bytes), 16777216, 1);
+if idx ~= 6 || err
+    error('array32 err');
+end
+
+bytes = uint8([hex2dec('dd') 1 0 0]);
+[idx, err] = microbuf.check_array32(bytes, length(bytes), 16777216, 1);
+if ~err
+    error('array32 err');
+end
 
 disp('- uint tests...');
 
