@@ -1,7 +1,7 @@
 # microbuf
 Data serialization toolchain for computers and embedded systems with C++ or MATLAB support
 
-## Visualized use cases
+## Visualized use case example
 ![Example use case](examples/microbuf-principle.png)
 
 ## Who might want to use `microbuf`?
