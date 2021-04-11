@@ -1,4 +1,4 @@
-disp('Executing MATLAB microbuf deserialization tests');
+disp('Executing MATLAB microbuf test: General deserialization');
 
 addpath(fullfile(fileparts(mfilename('fullpath')), "/../../matlab"));
 
