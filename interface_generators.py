@@ -175,28 +175,43 @@ class Message:
         return num_bytes
 
 
+class DataTypeHandler:
+    """
+    Abstraction of how to handle a specific data type in a language
+    """
+    def __init__(self, data_type, init_value, serialize_fun, deserialize_fun):
+        self.data_type: str = data_type
+        self.init_value: str = init_value
+        self.serialize_fun: str = serialize_fun
+        self.deserialize_fun: str = deserialize_fun
+
+
+class ArrayTypeHandler:
+    """
+    Abstraction of how to generate and check array types
+    """
+    def __init__(self, serialization_fun: str, deserialization_fun: str):
+        self.serialization_fun = serialization_fun
+        self.deserialization_fun = deserialization_fun
+
+
 class CppInterfaceGenerator:
     DATA_TYPE_LOOKUP = {
-        # microbuf data type: [C++ data type, C++ serialization method]
-        PlainTypes.bool: ["bool", "gen_bool", "parse_bool"],
-        PlainTypes.uint8: ["uint8_t", "gen_uint8", "parse_uint8"],
-        PlainTypes.uint16: ["uint16_t", "gen_uint16", "parse_uint16"],
-        PlainTypes.uint32: ["uint32_t", "gen_uint32", "parse_uint32"],
-        PlainTypes.uint64: ["uint64_t", "gen_uint64", "parse_uint64"],
-        PlainTypes.float32: ["float", "gen_float32", "parse_float32"],
-        PlainTypes.float64: ["double", "gen_float64", "parse_float64"]
+        # Regarding init value: values will be initialized with {}
+        # microbuf data type: (data type, init value, serialization fun, deserialization fun)
+        PlainTypes.bool: DataTypeHandler("bool", None, "gen_bool", "parse_bool"),
+        PlainTypes.uint8: DataTypeHandler("uint8_t", None, "gen_uint8", "parse_uint8"),
+        PlainTypes.uint16: DataTypeHandler("uint16_t", None, "gen_uint16", "parse_uint16"),
+        PlainTypes.uint32: DataTypeHandler("uint32_t", None, "gen_uint32", "parse_uint32"),
+        PlainTypes.uint64: DataTypeHandler("uint64_t", None, "gen_uint64", "parse_uint64"),
+        PlainTypes.float32: DataTypeHandler("float", None, "gen_float32", "parse_float32"),
+        PlainTypes.float64: DataTypeHandler("double", None, "gen_float64", "parse_float64")
     }
 
-    ARRAY_GEN_LOOKUP = {
-        ArrayTypes.fixarray: "gen_fixarray",
-        ArrayTypes.array16: "gen_array16",
-        ArrayTypes.array32: "gen_array32"
-    }
-
-    ARRAY_CHECK_LOOKUP = {
-        ArrayTypes.fixarray: "check_fixarray",
-        ArrayTypes.array16: "check_array16",
-        ArrayTypes.array32: "check_array32"
+    ARRAY_LOOKUP = {
+        ArrayTypes.fixarray: ArrayTypeHandler("gen_fixarray", "check_fixarray"),
+        ArrayTypes.array16: ArrayTypeHandler("gen_array16", "check_array16"),
+        ArrayTypes.array32: ArrayTypeHandler("gen_array32", "check_array32")
     }
 
     def __init__(self, message: Message):
@@ -221,7 +236,7 @@ class CppInterfaceGenerator:
             logging.error("The C++ type for '{}' is unknown".format(field_type))
             sys.exit(1)
 
-        return CppInterfaceGenerator.DATA_TYPE_LOOKUP[field_type][0]
+        return CppInterfaceGenerator.DATA_TYPE_LOOKUP[field_type].data_type
 
     def _gen_include_guard_name(self):
         return "MICROBUF_MSG_{}_H".format(self.message.name.upper())
@@ -242,12 +257,13 @@ class CppInterfaceGenerator:
 
     def _get_definition_line(self, field: MessageField):
         """ Generate C++ definition line of a field """
+        # Note that values will be initialized using {}, written as {{}} in the strings below
         if type(field) == MessageFieldPlain:  # check without inheritance here (could e.g. be array otherwise)
             field = typing.cast(MessageFieldPlain, field)
-            return "{} {};".format(self._get_plain_cpp_data_type(field.type), field.name)
+            return "{} {}{{}};".format(self._get_plain_cpp_data_type(field.type), field.name)
         elif type(field) == MessageFieldPlainArray:
             field = typing.cast(MessageFieldPlainArray, field)
-            return "{} {}[{}];".format(self._get_plain_cpp_data_type(field.type), field.name, field.array_length)
+            return "{} {}[{}]{{}};".format(self._get_plain_cpp_data_type(field.type), field.name, field.array_length)
 
         logging.error("No definition for field {}".format(field.name))
         sys.exit(1)
@@ -260,7 +276,7 @@ class CppInterfaceGenerator:
             sys.exit(1)
 
         return "microbuf::insert_bytes<{}>(bytes, microbuf::{}({}));".format(
-            byte_index, CppInterfaceGenerator.DATA_TYPE_LOOKUP[field_type][1], object_name
+            byte_index, CppInterfaceGenerator.DATA_TYPE_LOOKUP[field_type].serialize_fun, object_name
         )
 
     @staticmethod
@@ -271,12 +287,12 @@ class CppInterfaceGenerator:
             sys.exit(1)
 
         return "microbuf::insert_bytes<{}>(bytes, microbuf::gen_multiple<{}>({}, microbuf::{}));".format(
-            byte_index, num_elements, object_name, CppInterfaceGenerator.DATA_TYPE_LOOKUP[field_type][1]
+            byte_index, num_elements, object_name, CppInterfaceGenerator.DATA_TYPE_LOOKUP[field_type].serialize_fun
         )
 
     def _gen_array_serialization_line(self):
         return "microbuf::insert_bytes<0>(bytes, microbuf::{}({}));\n".format(
-            CppInterfaceGenerator.ARRAY_GEN_LOOKUP[self.message.get_main_array_type()],
+            CppInterfaceGenerator.ARRAY_LOOKUP[self.message.get_main_array_type()].serialization_fun,
             self.message.get_num_of_plain_fields())
 
     @staticmethod
@@ -326,7 +342,7 @@ class CppInterfaceGenerator:
         result.append("".join([s4, "bool from_bytes(const microbuf::array<uint8_t,{}>& bytes) {{\n".format(
             self.message.get_num_of_bytes())]))
         result.append("".join([s4 * 2, "bool worked = microbuf::{}<0>(bytes, {});\n".format(
-            CppInterfaceGenerator.ARRAY_CHECK_LOOKUP[self.message.get_main_array_type()],
+            CppInterfaceGenerator.ARRAY_LOOKUP[self.message.get_main_array_type()].deserialization_fun,
             self.message.get_num_of_plain_fields())]))
         result.append("".join([s4 * 2, self._gen_return_on_error(), "\n"]))
 
@@ -335,7 +351,7 @@ class CppInterfaceGenerator:
             if type(field) == MessageFieldPlain:
                 field = typing.cast(MessageFieldPlain, field)
                 result.append("".join([s4 * 2, "worked = microbuf::{}<{}>(bytes, {});\n".format(
-                    CppInterfaceGenerator.DATA_TYPE_LOOKUP[field.type][2], byte_index, field.name)]))
+                    CppInterfaceGenerator.DATA_TYPE_LOOKUP[field.type].deserialize_fun, byte_index, field.name)]))
                 result.append("".join([s4 * 2, self._gen_return_on_error(), "\n"]))
                 byte_index = byte_index + PlainTypes.storage_size[field.type]
             elif type(field) == MessageFieldPlainArray:
@@ -343,7 +359,7 @@ class CppInterfaceGenerator:
                 result.append(
                     "".join([s4 * 2, "worked = microbuf::parse_multiple<{},{}>(bytes, {}, microbuf::{}<0>);\n".format(
                         field.array_length, byte_index, field.name,
-                        CppInterfaceGenerator.DATA_TYPE_LOOKUP[field.type][2])]))
+                        CppInterfaceGenerator.DATA_TYPE_LOOKUP[field.type].deserialize_fun)]))
                 result.append("".join([s4 * 2, self._gen_return_on_error(), "\n"]))
                 byte_index = byte_index + PlainTypes.storage_size[field.type] * field.array_length
             else:
@@ -361,24 +377,27 @@ class CppInterfaceGenerator:
 
 class MatlabInterfaceGenerator:
     DATA_TYPE_LOOKUP = {
-        # microbuf data type: [MATLAB data type, MATLAB init value, MATLAB deserialize function]
-        PlainTypes.bool: ["logical", "false", "microbuf.parse_bool"],
-        PlainTypes.uint8: ["uint8", "0", "microbuf.parse_uint8"],
-        PlainTypes.uint16: ["uint16", "0", "microbuf.parse_uint16"],
-        PlainTypes.uint32: ["uint32", "0", "microbuf.parse_uint32"],
-        PlainTypes.uint64: ["uint64", "0", "microbuf.parse_uint64"],
-        PlainTypes.float32: ["single", "0", "microbuf.parse_float32"],
-        PlainTypes.float64: ["double", "0", "microbuf.parse_float64"],
+        # microbuf data type: (data type, init value, serialize function, deserialize function)
+        PlainTypes.bool: DataTypeHandler("logical", "false", "microbuf.gen_bool", "microbuf.parse_bool"),
+        PlainTypes.uint8: DataTypeHandler("uint8", "0", "microbuf.gen_uint8", "microbuf.parse_uint8"),
+        PlainTypes.uint16: DataTypeHandler("uint16", "0", "microbuf.gen_uint16", "microbuf.parse_uint16"),
+        PlainTypes.uint32: DataTypeHandler("uint32", "0", "microbuf.gen_uint32", "microbuf.parse_uint32"),
+        PlainTypes.uint64: DataTypeHandler("uint64", "0", "microbuf.gen_uint64", "microbuf.parse_uint64"),
+        PlainTypes.float32: DataTypeHandler("single", "0", "microbuf.gen_float32", "microbuf.parse_float32"),
+        PlainTypes.float64: DataTypeHandler("double", "0", "microbuf.gen_float64", "microbuf.parse_float64"),
     }
 
-    ARRAY_CHECK_LOOKUP = {
-        ArrayTypes.fixarray: "check_fixarray",
-        ArrayTypes.array16: "check_array16",
-        ArrayTypes.array32: "check_array32"
+    ARRAY_LOOKUP = {
+        ArrayTypes.fixarray: ArrayTypeHandler("gen_fixarray", "check_fixarray"),
+        ArrayTypes.array16: ArrayTypeHandler("gen_array16", "check_array16"),
+        ArrayTypes.array32: ArrayTypeHandler("gen_array32", "check_array32")
     }
 
     def __init__(self, message: Message):
         self.message = message
+
+    def gen_serializer_filename(self):
+        return "serialize_{}.m".format(self.message.name)
 
     def gen_deserializer_filename(self):
         return "deserialize_{}.m".format(self.message.name)
@@ -392,27 +411,72 @@ class MatlabInterfaceGenerator:
                 sys.exit(1)
 
         if type(field) == MessageFieldPlain:
-            return "{} = {}({});\n".format(field.name, MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field.type][0],
-                                           MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field.type][1])
+            return "{} = {}({});\n".format(field.name, MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field.type].data_type,
+                                           MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field.type].init_value)
         elif type(field) == MessageFieldPlainArray:
-            return "{} = repmat({}({}), 1, {});\n".format(field.name,
-                                                          MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field.type][0],
-                                                          MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field.type][1],
-                                                          field.array_length)
+            return "{} = repmat({}({}), 1, {});\n".\
+                                        format(field.name,
+                                               MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field.type].data_type,
+                                               MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field.type].init_value,
+                                               field.array_length)
+
+    @staticmethod
+    def _get_plain_serialization_lines(field_type: str,
+                                       field_name: str,  # pass these field values separately b/c they may be modified
+                                       idx_start: str,
+                                       idx_end: str,
+                                       line_indent: str,
+                                       lines: typing.List[str]):
+        """ Get the MATLAB serialization line of a plain field """
+        if field_type not in MatlabInterfaceGenerator.DATA_TYPE_LOOKUP:
+            logging.error("Deserialization for type {} is unknown".format(field_type))
+            sys.exit(1)
+
+        lines.append(f"""{line_indent}bytes({idx_start}:{idx_end}) = """
+                     f"""{MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field_type].serialize_fun}({field_name});\n""")
 
     @staticmethod
     def _get_plain_deserialization_lines(field_type: str, object_name, line_indent: str = ""):
-        """ Get the C++ serialization line of a plain field """
+        """ Get the MATLAB deserialization line of a plain field """
         if field_type not in MatlabInterfaceGenerator.DATA_TYPE_LOOKUP:
             logging.error("Deserialization for type {} is unknown".format(field_type))
             sys.exit(1)
 
         lines = []
         lines.append("".join([line_indent, "[idx, err, {}] = {}(bytes, bytes_length, idx);\n".format(
-                                object_name, MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field_type][2])]))
+                                object_name, MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[field_type].deserialize_fun)]))
         lines.append("".join([line_indent, "if err ;return; end\n"]))
 
         return "".join(lines)
+
+    def _get_serialization_lines(self, field: MessageField, idx: int, lines: typing.List[str]):
+        if type(field) == MessageFieldPlain:
+            field = typing.cast(MessageFieldPlain, field)
+            idx_start = idx
+            idx_end = idx + field.get_num_of_bytes() - 1
+
+            self._get_plain_serialization_lines(field.type, field.name, str(idx_start), str(idx_end), "", lines)
+            lines.append("\n")
+
+            idx = idx_end+1
+        elif type(field) == MessageFieldPlainArray:
+            field = typing.cast(MessageFieldPlainArray, field)
+            line_indent = "    "
+            bytes_per_elem = field.get_num_of_bytes() // field.get_num_of_plain_fields()
+
+            lines.append("".join(["for i=1:{}\n".format(field.array_length)]))
+            # due to the for loop we have to calculate the index repeatedly in MATLAB
+            lines.append(f"{line_indent}idx = {idx} + (i-1)*{bytes_per_elem};\n")
+            self._get_plain_serialization_lines(field.type, f"{field.name}(i)", "idx", f"idx+{bytes_per_elem-1}",
+                                                line_indent, lines)
+            lines.append("end\n\n")
+
+            idx += field.get_num_of_bytes()
+        else:
+            logging.error("Field type unknown: {}".format(field))
+            sys.exit(1)
+
+        return idx
 
     def _get_deserialization_lines(self, field: MessageField):
         lines = []
@@ -430,6 +494,43 @@ class MatlabInterfaceGenerator:
             sys.exit(1)
 
         return "".join(lines)
+
+    def gen_serializer_content(self) -> str:
+        result: typing.List[str] = []
+        fun_name = f"serialize_{self.message.name}"
+        result.append(f"""function bytes = {fun_name}"""
+                      f"""({', '.join(f.name for f in self.message.fields)})""")
+        result.append("\n")
+        result.append(f"% {fun_name} Serialize microbuf message {self.message.name} (version {self.message.version})")
+        result.append("\n\n")
+
+        # initialize result variable (bytes array)
+        result.append(f"bytes = repmat(uint8(0), 1, {self.message.get_num_of_bytes()});\n\n")
+
+        idx = 1  # byte index where next value should start
+        # add initial array
+        array_storage_size = ArrayTypes.storage_size[self.message.get_main_array_type()]
+        result.append("bytes(1:{}) = microbuf.{}({});\n\n".format(
+            1+array_storage_size-1,
+            MatlabInterfaceGenerator.ARRAY_LOOKUP[self.message.get_main_array_type()].serialization_fun,
+            self.message.get_num_of_plain_fields()
+        ))
+
+        idx += array_storage_size
+
+        # serialize all fields
+        for field in self.message.fields:
+            idx = self._get_serialization_lines(field, idx, result)
+
+        # add crc
+        if self.message.append_checksum:
+            result.append(f"""bytes({idx}:{idx+PlainTypes.storage_size[PlainTypes.uint16]-1}) = """
+                          f"""{MatlabInterfaceGenerator.DATA_TYPE_LOOKUP[PlainTypes.uint16].serialize_fun}"""
+                          f"""(microbuf.crc16_aug_ccitt(bytes, {idx-1}));\n\n""")
+            idx += PlainTypes.storage_size[PlainTypes.uint16]
+
+        result.append("end")
+        return "".join(result)
 
     def gen_deserializer_content(self):
         result = []  # type: typing.List[str]
@@ -453,7 +554,7 @@ class MatlabInterfaceGenerator:
 
         # check initial array
         result.append("[idx, err] = microbuf.{}(bytes, bytes_length, {}, idx);\n".format(
-                        MatlabInterfaceGenerator.ARRAY_CHECK_LOOKUP[self.message.get_main_array_type()],  # unchecked
+                        MatlabInterfaceGenerator.ARRAY_LOOKUP[self.message.get_main_array_type()].deserialization_fun,  # unchecked
                         self.message.get_num_of_plain_fields()))
         result.append("if err ;return; end\n\n")
 

@@ -1,2 +1,0 @@
-test_matlab_general
-test_TestMessage1

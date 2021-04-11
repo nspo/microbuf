@@ -101,10 +101,15 @@ def create_interface(args, message: Message):
 
     print("-- Creating MATLAB interface for message {}...".format(message.name))
     mat_if = MatlabInterfaceGenerator(message)
-    mat_file_path = os.path.join(args.out, mat_if.gen_deserializer_filename())
-    print("--- Saving as {}".format(mat_file_path))
-    with open(mat_file_path, "w") as outfile:
+    mat_deserializer_file_path = os.path.join(args.out, mat_if.gen_deserializer_filename())
+    print("--- Saving deserializer as {}".format(mat_deserializer_file_path))
+    with open(mat_deserializer_file_path, "w") as outfile:
         outfile.write(mat_if.gen_deserializer_content())
+
+    mat_serializer_file_path = os.path.join(args.out, mat_if.gen_serializer_filename())
+    print("--- Saving serializer as {}".format(mat_serializer_file_path))
+    with open(mat_serializer_file_path, "w") as outfile:
+        outfile.write(mat_if.gen_serializer_content())
 
 
 def main():

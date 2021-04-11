@@ -32,11 +32,12 @@ script:
   - make
   - test/cpp/microbuf_tests
   - cd ..
-  - echo "MATLAB tests" # note that C++ tests need to run before these
+  - echo "MATLAB tests"
   - cd test/matlab
-  - octave-cli run_all_tests.m
+  - ./run_standalone_tests.sh
+  - ./run_integration_tests.sh # note that C++ tests need to run before these
   - cd ../..
-  - echo "Arduino tests"
+  - echo "Arduino tests (compilation only)"
   - cd examples/arduino
   - ln -s ../../cpp/microbuf.h microbuf.h
   - arduino --verify --board arduino:avr:uno basic_sketch.ino

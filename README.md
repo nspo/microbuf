@@ -7,9 +7,9 @@ Data serialization toolchain for computers and embedded systems with C++ or MATL
 ## Who might want to use `microbuf`?
 You might want to use it if you plan to create an interface between devices running a C++ application (a computer or embedded system) and/or devices running (possibly compiled) MATLAB code (Simulink on PC or embedded systems).
 One possible use case would be "Send control data from computer over UDP to embedded system". 
-The number of supported languages is currently limited - C++ for serializing and deserializing (Tx+Rx) and MATLAB for deserializing (Rx). 
+The currently supported languages are C++ and MATLAB, for both serialization and deserialization (Tx+Rx). 
 This makes it possible to e.g. send data from a [ROS](https://www.ros.org/) node to a [dSPACE MicroAutoBox](https://www.dspace.com/en/inc/home/products/hw/micautob/microautobox2.cfm), from an Arduino to a Simulink simulation on a PC, or exchange data between multiple Arduinos - without writing the interface code byte-by-byte or worrying about things like [endianness](https://en.wikipedia.org/wiki/Endianness).
-Due to the structure of the project, support for more languages can be added with reasonable effort.
+Support for more languages can be added with reasonable effort.
 
 ## Why not just use `protobuf`/`JSON`/`matlab-msgpack`/...?
 Using another framework with more features like [protobuf](https://github.com/protocolbuffers/protobuf) may indeed make sense in many cases.
@@ -30,7 +30,7 @@ The following data types are currently supported:
 | Language | Serialization | Deserialization | CRC support | Examples | Notes |
 |---|---|---|---|---|---|
 | C++ | ✔ | ✔ | ✔ | ROS node; C++ application; Arduino sketch | |
-| MATLAB | ✘ | ✔ | ✔ | dSPACE MicroAutoBox; Simulink simulation | Usable in Simulink; compiles with Simulink/MATLAB Coder |
+| MATLAB | ✔ | ✔ | ✔ | dSPACE MicroAutoBox; Simulink simulation | Usable in Simulink; compiles with Simulink/MATLAB Coder |
 | ... | ✘ | ✘ | ✘ | | Please open a feature request or PR for new target languages |
 
 ## How does it work?
@@ -50,7 +50,7 @@ content:
 
 More examples can be found under [test/messages/](test/messages/).
 
-When you now execute `python3 microbuf.py SensorData.mmsg`, serializers and deserializers for the supported languages will automatically be generated.
+When you now execute `./microbuf.py SensorData.mmsg`, serializers and deserializers for the supported languages will automatically be generated.
 You can use the serializers to convert data to bytes, send them to your receiver (e.g. via UDP or I2C), and decode them there with the deserializers.
 
 ## How is the data serialized?
@@ -67,7 +67,7 @@ cd microbuf
 - Make sure the requirements (only `pyyaml` at the time of writing) are installed:
   - On Ubuntu/Debian systems: `sudo apt install python3-yaml`
   - Or using `pip`: `pip3 install -r requirements.txt`
-- Try `microbuf` with the example message: `python3 microbuf.py SensorData.mmsg`
+- Try `microbuf` with the example message: `./microbuf.py SensorData.mmsg`
 - In case you want to run the unit tests, you need to download the submodules: `git submodule update --init --recursive`
 
 ## Example: C++ application to Simulink
@@ -102,6 +102,7 @@ Note that in order to simulate or compile such a model, the `matlab` folder of `
 You can of course also just copy the contained `+microbuf` folder to a place in your project which is on your MATLAB path anyway. 
 
 The `examples` folder also contains the [full Simulink model](examples/cpp_to_simulink_via_udp/udp_receiver.slx).
+In the same file you will also find a commented out example using MATLAB to serialize data.
 
 ## Example: ROS C++ node to dSPACE MicroAutoBox
 Largely the same things need to done for this example as for the previous one.
