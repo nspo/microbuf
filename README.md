@@ -20,7 +20,7 @@ Using another framework with more features like [protobuf](https://github.com/pr
 
 ## What kind of data can be sent?
 The following data types are currently supported:
- - `boolean`
+ - `bool`
  - Unsigned integers: `uint8`, `uint16`, `uint32`, and `uint64`
  - Floating point: `float32`, `float64`
  - Arrays of the above with a static size
@@ -47,6 +47,8 @@ content:
   angle: float32[10]
   robot_id: uint8
 ```
+
+More examples can be found under [test/messages/](test/messages/).
 
 When you now execute `python3 microbuf.py SensorData.mmsg`, serializers and deserializers for the supported languages will automatically be generated.
 You can use the serializers to convert data to bytes, send them to your receiver (e.g. via UDP or I2C), and decode them there with the deserializers.
