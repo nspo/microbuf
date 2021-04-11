@@ -3,7 +3,7 @@
 #include "SensorData.h" // SensorData.mmsg must have been converted before trying to compile this!
 #include <iostream>
 
-TEST(microbuf_cpp_generated_message, serialize_then_deserialize)
+TEST(microbuf_cpp_SensorData, serialize_then_deserialize)
 {
     SensorData_struct_t sensor_data {};
     for(size_t i=0; i<10; ++i)

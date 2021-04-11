@@ -12,6 +12,7 @@ include_directories(
 add_executable(microbuf_tests
     test_serialization.cpp
     test_deserialization.cpp
-    test_generated_message.cpp
+    test_SensorData.cpp
+    test_TestMessage1.cpp
 )
 target_link_libraries(microbuf_tests gtest gtest_main)

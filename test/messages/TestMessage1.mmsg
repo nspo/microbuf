@@ -1,0 +1,10 @@
+version: 1
+append_checksum: yes
+content:
+  bool_val: bool
+  uint8_val: uint8
+  uint16_val: uint16
+  uint32_val: uint32
+  uint64_val: uint64
+  float32_arr_val: float32[10]
+  float64_arr_val: float64[10]

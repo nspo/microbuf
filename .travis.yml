@@ -21,13 +21,9 @@ before_script:
 
 script:
   - echo "Basic message conversion (Python) and compiling (C++)"
-  - python3 microbuf.py SensorData.mmsg
+  - python3 microbuf.py *.mmsg test/messages/*.mmsg
   - cd examples/cpp_to_simulink_via_udp/
   - make
-  - cd ../..
-  - echo "MATLAB tests"
-  - cd test/matlab
-  - octave-cli test_matlab.m
   - cd ../..
   - echo "C++ tests"
   - mkdir build
@@ -36,6 +32,10 @@ script:
   - make
   - test/cpp/microbuf_tests
   - cd ..
+  - echo "MATLAB tests" # note that C++ tests need to run before these
+  - cd test/matlab
+  - octave-cli run_all_tests.m
+  - cd ../..
   - echo "Arduino tests"
   - cd examples/arduino
   - ln -s ../../cpp/microbuf.h microbuf.h
