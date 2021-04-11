@@ -34,7 +34,7 @@ script:
   - cd build
   - cmake ..
   - make
-  - test/microbuf_tests
+  - test/cpp/microbuf_tests
   - cd ..
   - echo "Arduino tests"
   - cd examples/arduino
