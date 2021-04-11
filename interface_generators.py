@@ -362,7 +362,7 @@ class CppInterfaceGenerator:
 class MatlabInterfaceGenerator:
     DATA_TYPE_LOOKUP = {
         # microbuf data type: [MATLAB data type, MATLAB init value, MATLAB deserialize function]
-        PlainTypes.bool: ["bool", "false", "microbuf.parse_bool"],
+        PlainTypes.bool: ["logical", "false", "microbuf.parse_bool"],
         PlainTypes.uint8: ["uint8", "0", "microbuf.parse_uint8"],
         PlainTypes.uint16: ["uint16", "0", "microbuf.parse_uint16"],
         PlainTypes.uint32: ["uint32", "0", "microbuf.parse_uint32"],
