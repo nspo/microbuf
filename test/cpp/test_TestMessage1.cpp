@@ -39,24 +39,15 @@ TEST(microbuf_cpp_TestMessage1, serialize_then_deserialize)
     wrong_serialized_bytes[5] = 0xf0;
     EXPECT_FALSE(msg2.from_bytes(wrong_serialized_bytes));
 
-    // print output to console so it can be used in MATLAB test
-    if (true) { // NOLINT
-        const std::string filename = "TestMessage1_serialized.m";
-        std::cout << "Printing content of TestMessage1 for MATLAB to file " << filename << "\n";
-        std::ofstream ofs(filename);
-        if (!ofs) {
-            std::cerr << "Cannot write to "<<filename<< " - aborting";
-            return;
-        }
-        ofs << "bytes = uint8([";
-        const auto bytes = msg.as_bytes();
-        bool first = true;
-        for(const auto byte : bytes) {
-            if (first) first = false;
-            else ofs << ", ";
-
-            ofs << static_cast<int>(byte);
-        }
-        ofs<<"]);\n";
+    // write output to file so it can be used in MATLAB deserialization test
+    const std::string filename = "TestMessage1_serialized_by_cpp.bin";
+    std::cout << "Printing content of TestMessage1 as binary to file " << filename << "\n";
+    std::ofstream ofs(filename, std::ios::binary);
+    if (!ofs) {
+        std::cerr << "Cannot write to "<<filename<< " - aborting";
+        FAIL();
+        return;
     }
+    const auto bytes = msg.as_bytes();
+    ofs.write(reinterpret_cast<const char *>(&bytes[0]), TestMessage1_struct_t::data_size);
 }
